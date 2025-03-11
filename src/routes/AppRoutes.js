@@ -2,11 +2,12 @@ import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import Login from '../features/auth/Login';
 import Register from '../features/auth/Register';
+import ForgotPassword from '../features/auth/ForgotPassword';
+import ResetPassword from '../features/auth/ResetPassword';
+import Dashboard from '../features/dashboard/Dashboard';
 import AuthLayout from '../components/layout/AuthLayout';
 import smartFarmingImage from '../assets/images/smart-farming.jpg';
 
-// Placeholder Dashboard component (sẽ thay thế sau)
-const Dashboard = () => <div>Dashboard Page - Coming Soon</div>;
 
 // Protected Route component
 const ProtectedRoute = ({ children }) => {
@@ -32,6 +33,16 @@ const AppRoutes = () => {
           <Register />
         </AuthLayout>
       } />
+      <Route path="/forgot-password" element={
+        <AuthLayout image={smartFarmingImage}>
+          <ForgotPassword />
+        </AuthLayout>
+      } />
+       <Route path="/reset-password/:token" element={
+        <AuthLayout image={smartFarmingImage}>
+          <ResetPassword />
+        </AuthLayout>
+      } />
       <Route path="/dashboard" element={
         <ProtectedRoute>
           <Dashboard />
@@ -43,4 +54,4 @@ const AppRoutes = () => {
   );
 };
 
-export default AppRoutes; 
+export default AppRoutes;

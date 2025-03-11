@@ -55,10 +55,20 @@ export const forgotPassword = async (userData) => {
   }
 };
 
-// Reset password
-export const resetPassword = async (userData) => {
+//validateResetToken
+export const validateResetToken = async (token) => {
   try {
-    const response = await api.post('/reset-password', userData);
+    const response = await api.get(`/reset-password/validate/${token}`);
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};
+
+// Reset password
+export const resetPassword = async (token, newPassword) => {
+  try {
+    const response = await api.post(`/reset-password/${token}`, { password: newPassword });
     return response.data;
   } catch (error) {
     throw error;
@@ -91,6 +101,7 @@ const authService = {
   registerUser,
   forgotPassword,
   resetPassword,
+  validateResetToken,
   getCurrentUser,
   logoutUser,
   isAuthenticated
