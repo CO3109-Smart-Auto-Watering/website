@@ -86,10 +86,16 @@ export const getCurrentUser = async () => {
 };
 
 // Logout user
-export const logoutUser = () => {
-  localStorage.removeItem('token');
+export const logoutUser = async (navigate) => { 
+  try {
+    await api.post(`/logout`);
+    localStorage.removeItem("token");
+    // alert("Logout successful!");
+    navigate("/login"); // Redirect using useNavigate
+  } catch (error) {
+    console.error("Logout failed", error);
+  }
 };
-
 // Check if user is authenticated
 export const isAuthenticated = () => {
   const token = localStorage.getItem('token');

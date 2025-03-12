@@ -4,7 +4,11 @@ import { LineChart, Line, BarChart, Bar, PieChart, Pie, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { FaThermometerHalf, FaTint, FaSeedling, FaPrint, FaRegCalendarAlt, 
   FaPowerOff, FaMap, FaSlidersH, FaCloudSun, FaMapMarkedAlt, FaLeaf, 
-  FaChartLine, FaWater, FaTools } from 'react-icons/fa';
+  FaChartLine, FaWater, FaTools, FaSignOutAlt  } from 'react-icons/fa';
+
+import AdafruitData from './AdafruitData';
+import { logoutUser } from '../../services/authService';
+import { useNavigate } from 'react-router-dom';
 
 // Styled Components
 const DashboardContainer = styled.div`
@@ -39,6 +43,7 @@ const Logo = styled.h1`
 `;
 
 const MainContent = styled.div`
+  margin-left: 260px;
   flex: 1;
   padding: 32px;
   overflow-y: auto;
@@ -769,6 +774,8 @@ const schedules = [
 ];
 
 const Dashboard = () => {
+  const navigate = useNavigate();
+
   const [pumpMode, setPumpMode] = useState('auto'); 
   const [isPumpActive, setIsPumpActive] = useState(false);
   
@@ -826,12 +833,15 @@ const Dashboard = () => {
 
   return (
     <DashboardContainer>
-      <Sidebar>
+      <Sidebar className="fixed top-0 left-0 h-screen ">
         <SidebarHeader>
           <Logo>
             <FaSeedling /> Smart Garden
           </Logo>
         </SidebarHeader>
+        <button className='fixed bottom-5 left-8 inline-flex items-center gap-4 text-16px' onClick={() => logoutUser(navigate)}> 
+          <FaSignOutAlt/> Đăng xuất
+        </button>
       </Sidebar>
       
       <MainContent>
@@ -848,21 +858,27 @@ const Dashboard = () => {
             <CardHeader>
               <CardTitle><FaThermometerHalf /> Nhiệt độ</CardTitle>
             </CardHeader>
-            <CardValue>28°C</CardValue>
+            <CardValue>
+              <AdafruitData feedName="temperature" />°C
+            </CardValue>
           </Card>
           
           <Card>
             <CardHeader>
               <CardTitle><FaTint /> Độ ẩm không khí</CardTitle>
-            </CardHeader>
-            <CardValue>72%</CardValue>
+            </CardHeader>            
+            <CardValue>
+              <AdafruitData feedName="humidity" />%
+            </CardValue>
           </Card>
           
           <Card>
             <CardHeader>
               <CardTitle><FaSeedling /> Độ ẩm đất</CardTitle>
             </CardHeader>
-            <CardValue>58%</CardValue>
+            <CardValue>
+              <AdafruitData feedName="soil-humidity" />%
+            </CardValue>
           </Card>
         </Grid>
         
