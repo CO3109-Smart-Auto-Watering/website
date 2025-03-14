@@ -4,11 +4,10 @@ import { LineChart, Line, BarChart, Bar, PieChart, Pie, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { FaThermometerHalf, FaTint, FaSeedling, FaPrint, FaRegCalendarAlt, 
   FaPowerOff, FaMap, FaSlidersH, FaCloudSun, FaMapMarkedAlt, FaLeaf, 
-  FaChartLine, FaWater, FaTools, FaSignOutAlt  } from 'react-icons/fa';
+  FaChartLine, FaWater, FaTools  } from 'react-icons/fa';
 
 import AdafruitData from './AdafruitData';
-import { logoutUser } from '../../services/authService';
-import { useNavigate } from 'react-router-dom';
+import NavBar from '../../components/layout/NavBar';
 
 // Styled Components
 const DashboardContainer = styled.div`
@@ -18,29 +17,29 @@ const DashboardContainer = styled.div`
   background: #f8f9fc;
 `;
 
-const Sidebar = styled.div`
-  width: 260px;
-  background: #4975d1;
-  color: white;
-  padding: 24px 0;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-`;
+// const Sidebar = styled.div`
+//   width: 260px;
+//   background: #4975d1;
+//   color: white;
+//   padding: 24px 0;
+//   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+// `;
 
-const SidebarHeader = styled.div`
-  padding: 0 24px 24px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-`;
+// const SidebarHeader = styled.div`
+//   padding: 0 24px 24px;
+//   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+// `;
 
-const Logo = styled.h1`
-  font-size: 22px;
-  margin: 0;
-  display: flex;
-  align-items: center;
+// const Logo = styled.h1`
+//   font-size: 22px;
+//   margin: 0;
+//   display: flex;
+//   align-items: center;
   
-  svg {
-    margin-right: 12px;
-  }
-`;
+//   svg {
+//     margin-right: 12px;
+//   }
+// `;
 
 const MainContent = styled.div`
   margin-left: 260px;
@@ -774,7 +773,6 @@ const schedules = [
 ];
 
 const Dashboard = () => {
-  const navigate = useNavigate();
 
   const [pumpMode, setPumpMode] = useState('auto'); 
   const [isPumpActive, setIsPumpActive] = useState(false);
@@ -833,16 +831,7 @@ const Dashboard = () => {
 
   return (
     <DashboardContainer>
-      <Sidebar className="fixed top-0 left-0 h-screen ">
-        <SidebarHeader>
-          <Logo>
-            <FaSeedling /> Smart Garden
-          </Logo>
-        </SidebarHeader>
-        <button className='fixed bottom-5 left-8 inline-flex items-center gap-4 text-16px' onClick={() => logoutUser(navigate)}> 
-          <FaSignOutAlt/> Đăng xuất
-        </button>
-      </Sidebar>
+      <NavBar />
       
       <MainContent>
         <Header>

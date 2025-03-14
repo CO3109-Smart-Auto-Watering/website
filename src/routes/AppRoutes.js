@@ -7,7 +7,7 @@ import ResetPassword from '../features/auth/ResetPassword';
 import Dashboard from '../features/dashboard/Dashboard';
 import AuthLayout from '../components/layout/AuthLayout';
 import smartFarmingImage from '../assets/images/smart-farming.jpg';
-
+import Users from '../features/users/Users';
 
 // Protected Route component
 const ProtectedRoute = ({ children }) => {
@@ -46,6 +46,11 @@ const AppRoutes = () => {
       <Route path="/dashboard" element={
         <ProtectedRoute>
           <Dashboard />
+        </ProtectedRoute>
+      } />
+      <Route path="/users" element={
+        <ProtectedRoute>
+          <Users />
         </ProtectedRoute>
       } />
       <Route path="/" element={<Navigate to="/login" replace />} />
