@@ -10,15 +10,26 @@ import smartFarmingImage from '../assets/images/smart-farming.jpg';
 import Users from '../features/users/Users';
 
 // Protected Route component
-const ProtectedRoute = ({ children }) => {
+const ProtectedRoute = ({ children, allowedRoles }) => {
   const isAuthenticated = localStorage.getItem('token') !== null;
   
   if (!isAuthenticated) {
     return <Navigate to="/login" />;
   }
+
+  const userRole = getUserRole();
+
+  if (!userRole || !allowedRoles.includes(userRole)) {
+    return <Navigate to="/login" />;
+  }
   
   return children;
 };
+
+export const getUserRole = () => {
+  const role = localStorage.getItem("role");
+  return role;
+}
 
 const AppRoutes = () => {
   return (
@@ -44,15 +55,16 @@ const AppRoutes = () => {
         </AuthLayout>
       } />
       <Route path="/dashboard" element={
-        <ProtectedRoute>
+        <ProtectedRoute allowedRoles={["user", "admin"]}>
           <Dashboard />
         </ProtectedRoute>
       } />
       <Route path="/users" element={
-        <ProtectedRoute>
+        <ProtectedRoute allowedRoles={["admin"]}>
           <Users />
         </ProtectedRoute>
       } />
+    
       <Route path="/" element={<Navigate to="/login" replace />} />
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>

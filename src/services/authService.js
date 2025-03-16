@@ -90,6 +90,7 @@ export const logoutUser = async (navigate) => {
   try {
     await api.post(`/logout`);
     localStorage.removeItem("token");
+    localStorage.removeItem("role");
     // alert("Logout successful!");
     navigate("/login"); // Redirect using useNavigate
   } catch (error) {

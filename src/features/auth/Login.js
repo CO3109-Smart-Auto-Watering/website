@@ -138,6 +138,7 @@ const Login = () => {
       
       // Lưu token vào localStorage
       localStorage.setItem('token', response.token);
+      localStorage.setItem('role', activeRole);
       
       // Chuyển hướng đến trang chính
       navigate('/dashboard');
