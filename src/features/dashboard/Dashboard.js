@@ -866,7 +866,7 @@ const Dashboard = () => {
               <CardTitle><FaSeedling /> Độ ẩm đất</CardTitle>
             </CardHeader>
             <CardValue>
-              <AdafruitData feedName="soil-humidity" />%
+              <AdafruitData feedName="soil-moisture" />%
             </CardValue>
           </Card>
         </Grid>
