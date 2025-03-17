@@ -1,4 +1,5 @@
 import React from 'react';
+import { useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import Login from '../features/auth/Login';
 import Register from '../features/auth/Register';
@@ -13,15 +14,22 @@ import Users from '../features/users/Users';
 const ProtectedRoute = ({ children, allowedRoles }) => {
   const isAuthenticated = localStorage.getItem('token') !== null;
   
-  if (!isAuthenticated) {
-    return <Navigate to="/login" />;
-  }
-
   const userRole = getUserRole();
+
+  useEffect(() => {
+    if (!userRole || !allowedRoles.includes(userRole)) {
+      alert("You don't have access to this page");
+    }
+  }, [isAuthenticated, userRole, allowedRoles]);
 
   if (!userRole || !allowedRoles.includes(userRole)) {
     return <Navigate to="/login" />;
   }
+  
+  if (!isAuthenticated) {
+    return <Navigate to="/login" />;
+  }
+
   
   return children;
 };

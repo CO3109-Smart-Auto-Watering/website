@@ -2,7 +2,7 @@ import React from 'react'
 import styled from 'styled-components';
 import { logoutUser } from '../../services/authService';
 import { useNavigate } from 'react-router-dom';
-import { FaSeedling, FaSignOutAlt, FaHome, FaUser } from 'react-icons/fa';
+import { FaSeedling, FaSignOutAlt, FaHome, FaUsers } from 'react-icons/fa';
 import { Link, useLocation } from 'react-router-dom';
 import { getUserRole } from '../../routes/AppRoutes';
 
@@ -41,7 +41,7 @@ const NavBar = () => {
           <FaSeedling /> Smart Garden
         </Logo>
       </SidebarHeader>
-      <nav className="flex-1 pl-3">
+      <nav className=" flex-1 pl-3">
         <ul className="">
           <Link to="/dashboard" style={{ textDecoration: 'none', color: 'inherit' }}>
             <div className={location.pathname === '/dashboard' ? 'bg-[#678cd9] w-[95%] rounded-[10px]' : ''}>
@@ -51,16 +51,16 @@ const NavBar = () => {
               </li>
             </div>
           </Link>
-          {
+          { getUserRole() === 'admin' ?  (
             <Link to="/users" style={{ textDecoration: 'none', color: 'inherit' }}>
               <div className={location.pathname === '/users' ? 'bg-[#678cd9] w-[95%] rounded-[10px]' : ''}>
                 <li className="flex items-center gap-4 p-4 hover:bg-[#678cd9] w-[95%] rounded-[10px] cursor-pointer">
-                  <FaUser />
+                  <FaUsers />
                   <span> Users</span>
                 </li>
               </div>
-            </Link>
-          }
+            </Link> 
+          ) : (<span></span> )}
           <li className='flex items-center gap-4 p-4 hover:bg-[#678cd9] w-[95%] rounded-[10px] cursor-pointer' onClick={() => logoutUser(navigate)}>
             <FaSignOutAlt />
             <span>

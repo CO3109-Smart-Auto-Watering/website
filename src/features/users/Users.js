@@ -19,13 +19,13 @@ const UserList = () => {
 
             <NavBar />
             <MainContent>
-                <div className='text-[28px]'>All Users</div>
-                <div className='flex my-[16px]'>
+                
+                <div className='flex mt-[0px] mb-[24px]'>
                     <div className='relative p-[16px] mr-[32px] bg-white w-[250px] h-[140px] [box-shadow:0px_4px_12px_rgba(0,_0,_0,_0.05)] rounded-[14px]'>
                         <div className='flex'>
                             <div>
                                 <h2 className='text-[16px] text-[#636466]'>Total Customers</h2>
-                                {/* <h3 className='text-[28px] font-semibold'>{currentPage}</h3> */}
+                                <h3 className='text-[28px] font-semibold'>500</h3>
                             </div>
                             {/* <Image className='absolute right-[16px]'
                                 src={pageBalance} alt='pageBalance' width={50}></Image> */}
@@ -34,13 +34,13 @@ const UserList = () => {
                             <img className='mr-[4px]' src={trendUp} alt='trendUp'></img>
                             <span className='text-[14px] text-[#636466]'>
                                 <span className='text-[#00B69B]'>+15 </span>
-                                pages from SPSO</span>
+                                from last week</span>
                         </div>
                     </div>
                     <div className='relative p-[16px] mr-[32px] bg-white w-[250px] h-[140px] [box-shadow:0px_4px_12px_rgba(0,_0,_0,_0.05)] rounded-[14px]'>
                         <div className='flex'>
                             <div>
-                                <h2 className='text-[16px] text-[#636466]'>Total Pages Printed</h2>
+                                <h2 className='text-[16px] text-[#636466]'>Total</h2>
                                 {/* <h3 className='text-[28px] font-semibold'>{totalPrinted}</h3> */}
                             </div>
                             {/* <Image className='absolute right-[16px]'
@@ -54,6 +54,7 @@ const UserList = () => {
                         </div>
                     </div>
                 </div>
+                
                 <UserTable />
 
             </MainContent>
