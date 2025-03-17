@@ -64,12 +64,12 @@ const AppRoutes = () => {
         </AuthLayout>
       } />
       <Route path="/dashboard" element={
-        <ProtectedRoute allowedRoles={["user", "admin"]}>
+        <ProtectedRoute allowedRoles={["user"]}>
           <Dashboard />
         </ProtectedRoute>
       } />
       <Route path="/admin-dashboard" element={
-        <ProtectedRoute allowedRoles={["user", "admin"]}>
+        <ProtectedRoute allowedRoles={["admin"]}>
           <AdminDashboard />
         </ProtectedRoute>
       } />

@@ -43,6 +43,7 @@ const NavBar = () => {
       </SidebarHeader>
       <nav className=" flex-1 pl-3">
         <ul className="">
+        { getUserRole() === 'user' ?  (
           <Link to="/dashboard" style={{ textDecoration: 'none', color: 'inherit' }}>
             <div className={location.pathname === '/dashboard' ? 'bg-[#678cd9] w-[95%] rounded-[10px]' : ''}>
               <li className="flex items-center gap-4 p-4 hover:bg-[#678cd9] w-[95%] rounded-[10px] cursor-pointer">
@@ -51,6 +52,19 @@ const NavBar = () => {
               </li>
             </div>
           </Link>
+          ) : (<span></span> )}
+
+          { getUserRole() === 'admin' ?  (
+          <Link to="/admin-dashboard" style={{ textDecoration: 'none', color: 'inherit' }}>
+            <div className={location.pathname === '/admin-dashboard' ? 'bg-[#678cd9] w-[95%] rounded-[10px]' : ''}>
+              <li className="flex items-center gap-4 p-4 hover:bg-[#678cd9] w-[95%] rounded-[10px] cursor-pointer">
+                <FaHome />
+                <span> Dashboard</span>
+              </li>
+            </div>
+          </Link>
+          ) : (<span></span> )}
+
           { getUserRole() === 'admin' ?  (
             <Link to="/users" style={{ textDecoration: 'none', color: 'inherit' }}>
               <div className={location.pathname === '/users' ? 'bg-[#678cd9] w-[95%] rounded-[10px]' : ''}>

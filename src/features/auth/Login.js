@@ -130,25 +130,6 @@ const Login = () => {
     setIsLoading(true);
     
     try {
-      // Dữ liệu hard-coded cho tài khoản admin
-      const adminCredentials = {
-        username: 'admin',
-        password: 'admin123',
-        role: 'admin'
-      };
-
-      // Kiểm tra nếu là tài khoản admin hard-coded
-      if (
-        activeRole === 'admin' &&
-        formData.username === adminCredentials.username &&
-        formData.password === adminCredentials.password
-      ) {
-        // Giả lập đăng nhập thành công cho admin
-        localStorage.setItem('token', 'fake-token-for-admin');
-        localStorage.setItem('role', 'admin');
-        navigate('/admin-dashboard');
-      } else {
-        // Gọi API cho các tài khoản khác (user hoặc admin không khớp với hard-coded)
         const response = await loginUser({
           username: formData.username,
           password: formData.password,
@@ -165,7 +146,7 @@ const Login = () => {
         } else {
           navigate('/dashboard');
         }
-      }
+      
     } catch (error) {
       if (error.response && error.response.data) {
         setErrors({
