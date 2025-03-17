@@ -8,6 +8,7 @@ import ResetPassword from '../features/auth/ResetPassword';
 import Dashboard from '../features/dashboard/Dashboard';
 import AuthLayout from '../components/layout/AuthLayout';
 import smartFarmingImage from '../assets/images/smart-farming.jpg';
+import AdminDashboard from '../features/dashboard/AdminDashboard';
 import Users from '../features/users/Users';
 
 // Protected Route component
@@ -65,6 +66,11 @@ const AppRoutes = () => {
       <Route path="/dashboard" element={
         <ProtectedRoute allowedRoles={["user", "admin"]}>
           <Dashboard />
+        </ProtectedRoute>
+      } />
+      <Route path="/admin-dashboard" element={
+        <ProtectedRoute allowedRoles={["user", "admin"]}>
+          <AdminDashboard />
         </ProtectedRoute>
       } />
       <Route path="/users" element={
