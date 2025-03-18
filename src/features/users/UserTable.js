@@ -119,7 +119,7 @@ const UserTable = () => {
       </div>
 
       <Table className='' columns={columns} dataSource={searchResults} 
-      pagination={{ pageSize: 5,
+      pagination={{ pageSize: 10,
         showTotal: (total) => `Total Users: ${total}`,
        }} 
       />

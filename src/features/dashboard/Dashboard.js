@@ -1,10 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { LineChart, Line, BarChart, Bar, PieChart, Pie, AreaChart, Area, 
-  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { FaThermometerHalf, FaTint, FaSeedling, FaPrint, FaRegCalendarAlt, 
-  FaPowerOff, FaMap, FaSlidersH, FaCloudSun, FaMapMarkedAlt, FaLeaf, 
-  FaChartLine, FaWater, FaTools  } from 'react-icons/fa';
+import {
+  LineChart, Line, BarChart, Bar, PieChart, Pie, AreaChart, Area,
+  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
+} from 'recharts';
+import {
+  FaThermometerHalf, FaTint, FaSeedling, FaPrint, FaRegCalendarAlt,
+  FaPowerOff, FaMap, FaSlidersH, FaCloudSun, FaMapMarkedAlt, FaLeaf,
+  FaChartLine, FaWater, FaTools
+} from 'react-icons/fa';
 
 import AdafruitData from './AdafruitData';
 import NavBar from '../../components/layout/NavBar';
@@ -35,7 +39,7 @@ const DashboardContainer = styled.div`
 //   margin: 0;
 //   display: flex;
 //   align-items: center;
-  
+
 //   svg {
 //     margin-right: 12px;
 //   }
@@ -696,19 +700,19 @@ const zones = [
 ];
 
 const notifications = [
-  { 
-    id: 1, 
-    type: 'warning', 
-    title: 'Độ ẩm đất thấp', 
-    message: 'Khu vực "Vườn sau" có độ ẩm đất xuống dưới 50%', 
-    time: 'Vừa xong' 
+  {
+    id: 1,
+    type: 'warning',
+    title: 'Độ ẩm đất thấp',
+    message: 'Khu vực "Vườn sau" có độ ẩm đất xuống dưới 50%',
+    time: 'Vừa xong'
   },
-  { 
-    id: 2, 
-    type: 'info', 
-    title: 'Hoàn thành lịch trình', 
-    message: 'Đã hoàn thành tưới theo lịch trình lúc 18:00', 
-    time: '20 phút trước' 
+  {
+    id: 2,
+    type: 'info',
+    title: 'Hoàn thành lịch trình',
+    message: 'Đã hoàn thành tưới theo lịch trình lúc 18:00',
+    time: '20 phút trước'
   },
 ];
 
@@ -772,11 +776,17 @@ const schedules = [
   { id: 3, time: '22:00', duration: '10 phút', active: false },
 ];
 
+const API_URL = process.env.REACT_APP_API_URL
+const AIO_USERNAME = process.env.REACT_APP_AIO_USERNAME;  
+const AIO_KEY = process.env.REACT_APP_AIO_KEY; 
+
 const Dashboard = () => {
 
-  const [pumpMode, setPumpMode] = useState('auto'); 
+  const [pumpMode, setPumpMode] = useState('auto');
   const [isPumpActive, setIsPumpActive] = useState(false);
-  
+  const pumpName = 'water-pump';
+  const [loading, setLoading] = useState(false);
+
   // State cho các tính năng mới
   const [selectedZone, setSelectedZone] = useState(1);
   const [thresholds, setThresholds] = useState({
@@ -789,9 +799,58 @@ const Dashboard = () => {
   const [isListening, setIsListening] = useState(false);
 
   // Hàm cho các tính năng hiện có
-  const togglePump = () => {
-    if (pumpMode === 'manual') {
+  // const togglePump = () => {
+  //   if (pumpMode === 'manual') {
+  //     setIsPumpActive(!isPumpActive);
+  //   }
+  // };
+
+  console.log(isPumpActive, 'pumpactive');
+  useEffect(() => {
+    const fetchPumpStatus = async () => {
+      try {
+        const response = await fetch(
+          `https://io.adafruit.com/api/v2/${AIO_USERNAME}/feeds/${pumpName}/data?limit=1`,
+          {
+            headers: { "X-AIO-Key": AIO_KEY },
+          }
+        );
+
+        const data = await response.json();
+
+        if (data.length > 0) {
+          const pumpStatus = data[0].value === "ON"; 
+          setIsPumpActive(pumpStatus);
+        }
+      } catch (error) {
+        console.error("Error fetching pump status:", error);
+      }
+    };
+
+    fetchPumpStatus();
+    const interval = setInterval(fetchPumpStatus, 2000); // Cập nhật mỗi 2s
+    return () => clearInterval(interval);
+  }, []);
+
+  const togglePump = async () => {
+    if (loading) return;
+    setLoading(true);
+
+    try {
+      const newStatus = isPumpActive ? "OFF" : "ON";
+      const response = await fetch(`${API_URL}/pumps/${pumpName}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus }),
+      });
+
+      if (!response.ok) throw new Error("Failed to update pump status");
+
       setIsPumpActive(!isPumpActive);
+    } catch (error) {
+      console.error("Error updating pump status:", error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -832,7 +891,7 @@ const Dashboard = () => {
   return (
     <DashboardContainer>
       <NavBar />
-      
+
       <MainContent>
         <Header>
           <HeaderTitle>Bảng Điều Khiển</HeaderTitle>
@@ -840,7 +899,7 @@ const Dashboard = () => {
             <FaPrint /> In báo cáo
           </PrintButton>
         </Header>
-        
+
         {/* Quick Stats */}
         <Grid>
           <Card>
@@ -851,16 +910,16 @@ const Dashboard = () => {
               <AdafruitData feedName="temperature" />°C
             </CardValue>
           </Card>
-          
+
           <Card>
             <CardHeader>
               <CardTitle><FaTint /> Độ ẩm không khí</CardTitle>
-            </CardHeader>            
+            </CardHeader>
             <CardValue>
               <AdafruitData feedName="humidity" />%
             </CardValue>
           </Card>
-          
+
           <Card>
             <CardHeader>
               <CardTitle><FaSeedling /> Độ ẩm đất</CardTitle>
@@ -870,7 +929,7 @@ const Dashboard = () => {
             </CardValue>
           </Card>
         </Grid>
-        
+
         {/* Main Content */}
         <Grid>
           {/* Sensor Monitoring */}
@@ -891,28 +950,28 @@ const Dashboard = () => {
               </LineChart>
             </ResponsiveContainer>
           </LargeCard>
-          
+
           {/* Pump Control */}
           <Card>
             <CardHeader>
               <CardTitle><FaPowerOff /> Điều khiển bơm</CardTitle>
             </CardHeader>
             <PumpControlContainer>
-              <PumpModeButton 
-                $active={pumpMode === 'auto'} 
+              <PumpModeButton
+                $active={pumpMode === 'auto'}
                 onClick={() => setPumpMode('auto')}
               >
                 Tự động
               </PumpModeButton>
-              <PumpModeButton 
-                $active={pumpMode === 'manual'} 
+              <PumpModeButton
+                $active={pumpMode === 'manual'}
                 onClick={() => setPumpMode('manual')}
               >
                 Thủ công
               </PumpModeButton>
             </PumpControlContainer>
-            
-            {pumpMode === 'manual' && (
+
+            {/* {pumpMode === 'manual' && (
               <div style={{ textAlign: 'center' }}>
                 <PumpControlButton $active={isPumpActive} onClick={togglePump}>
                 <FaPowerOff />
@@ -921,9 +980,19 @@ const Dashboard = () => {
                   {isPumpActive ? 'Đang hoạt động' : 'Đã tắt'}
                 </div>
               </div>
+            )} */}
+            {pumpMode === "manual" && (
+              <div style={{ textAlign: "center" }}>
+                <PumpControlButton $active={isPumpActive} onClick={togglePump} disabled={loading}>
+                  <FaPowerOff />
+                </PumpControlButton>
+                <div style={{ marginTop: "10px", color: isPumpActive ? "#4975d1" : "#666" }}>
+                  {isPumpActive ? "Đang hoạt động" : "Đã tắt"}
+                </div>
+              </div>
             )}
           </Card>
-          
+
           {/* Pump Stats */}
           <Card>
             <CardHeader>
@@ -948,7 +1017,7 @@ const Dashboard = () => {
               </PieChart>
             </ResponsiveContainer>
           </Card>
-          
+
           {/* Irrigation Schedule */}
           <Card>
             <CardHeader>
@@ -996,21 +1065,21 @@ const Dashboard = () => {
             <ThresholdForm>
               <ThresholdItem>
                 <label>Độ ẩm đất tối thiểu</label>
-                <RangeSlider 
-                  min={20} 
-                  max={80} 
-                  value={thresholds.soilMoisture} 
-                  onChange={(e) => updateThreshold('soilMoisture', e.target.value)} 
+                <RangeSlider
+                  min={20}
+                  max={80}
+                  value={thresholds.soilMoisture}
+                  onChange={(e) => updateThreshold('soilMoisture', e.target.value)}
                 />
                 <ThresholdValue>{thresholds.soilMoisture}%</ThresholdValue>
               </ThresholdItem>
               <ThresholdItem>
                 <label>Thời gian tưới (phút)</label>
-                <RangeSlider 
-                  min={5} 
-                  max={30} 
-                  value={thresholds.wateringDuration} 
-                  onChange={(e) => updateThreshold('wateringDuration', e.target.value)} 
+                <RangeSlider
+                  min={5}
+                  max={30}
+                  value={thresholds.wateringDuration}
+                  onChange={(e) => updateThreshold('wateringDuration', e.target.value)}
                 />
                 <ThresholdValue>{thresholds.wateringDuration} phút</ThresholdValue>
               </ThresholdItem>
@@ -1047,9 +1116,9 @@ const Dashboard = () => {
             <GardenMap>
               <SVG width="100%" height="300px" viewBox="0 0 500 300">
                 {gardenAreas.map(area => (
-                  <GardenArea 
+                  <GardenArea
                     key={area.id}
-                    points={area.coordinates} 
+                    points={area.coordinates}
                     fill={getMoistureColor(area.moisture)}
                     stroke="#333"
                     onClick={() => selectGardenArea(area.id)}
@@ -1166,8 +1235,8 @@ const Dashboard = () => {
                   <DeviceInfo>
                     <DeviceName>{device.name}</DeviceName>
                     <DeviceStatus status={device.status}>
-                      {device.status === 'online' ? 'Đang hoạt động' : 
-                      device.status === 'offline' ? 'Mất kết nối' : 'Cần bảo trì'}
+                      {device.status === 'online' ? 'Đang hoạt động' :
+                        device.status === 'offline' ? 'Mất kết nối' : 'Cần bảo trì'}
                     </DeviceStatus>
                   </DeviceInfo>
                   <DeviceBattery>{device.battery}%</DeviceBattery>
@@ -1208,8 +1277,8 @@ const Dashboard = () => {
             </CardHeader>
             <VoiceControlIcon $listening={isListening}>{isListening ? '🎤' : '🔈'}</VoiceControlIcon>
             <VoiceControlText>
-              {isListening 
-                ? 'Đang nghe... Hãy nói lệnh của bạn' 
+              {isListening
+                ? 'Đang nghe... Hãy nói lệnh của bạn'
                 : 'Nhấn vào nút để điều khiển bằng giọng nói'}
             </VoiceControlText>
             <VoiceButton onClick={toggleVoiceControl}>
