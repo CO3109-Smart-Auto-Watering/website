@@ -9,6 +9,7 @@ import Dashboard from '../features/dashboard/Dashboard';
 import AuthLayout from '../components/layout/AuthLayout';
 import smartFarmingImage from '../assets/images/smart-farming.jpg';
 import AdminDashboard from '../features/dashboard/AdminDashboard';
+import DeviceList from '../components/DeviceList';
 import Users from '../features/users/Users';
 
 // Protected Route component
@@ -76,6 +77,11 @@ const AppRoutes = () => {
       <Route path="/users" element={
         <ProtectedRoute allowedRoles={["admin"]}>
           <Users />
+        </ProtectedRoute>
+      } />
+      <Route path="/devices-list" element={
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <DeviceList />
         </ProtectedRoute>
       } />
     
