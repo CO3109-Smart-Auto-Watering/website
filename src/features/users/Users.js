@@ -15,13 +15,13 @@ const MainContent = styled.div`
 
 const UserList = () => {
     return (
-        <div className='bg-[#f8f9fc] h-screen'>
+        <div className='bg-[#F5F5F5] h-[100%]'>
 
             <NavBar />
-            <MainContent>
+            <MainContent >
                 
                 <div className='flex mt-[0px] mb-[24px]'>
-                    <div className='relative p-[16px] mr-[32px] bg-white w-[250px] h-[140px] [box-shadow:0px_4px_12px_rgba(0,_0,_0,_0.05)] rounded-[14px]'>
+                    <div className='relative p-[16px] mr-[32px] bg-white w-[250px] h-[140px] [box-shadow:0px_4px_12px_rgba(0,_0,_0,_0.05)] rounded-[8px]'>
                         <div className='flex'>
                             <div>
                                 <h2 className='text-[16px] text-[#636466]'>Total Customers</h2>
@@ -37,7 +37,7 @@ const UserList = () => {
                                 from last week</span>
                         </div>
                     </div>
-                    <div className='relative p-[16px] mr-[32px] bg-white w-[250px] h-[140px] [box-shadow:0px_4px_12px_rgba(0,_0,_0,_0.05)] rounded-[14px]'>
+                    <div className='relative p-[16px] mr-[32px] bg-white w-[250px] h-[140px] [box-shadow:0px_4px_12px_rgba(0,_0,_0,_0.05)] rounded-[8px]'>
                         <div className='flex'>
                             <div>
                                 <h2 className='text-[16px] text-[#636466]'>Total</h2>

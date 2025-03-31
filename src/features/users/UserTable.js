@@ -18,13 +18,30 @@ const columns = [
     title: 'Email',
     dataIndex: 'email',
     key: 'email',
-    width: 450,
+    width: 400,
   },
   {
-    title: 'Role',
-    dataIndex: 'role',
-    key: 'role',
-    width: 200,
+    title: "Role",
+    dataIndex: "role",
+    key: "role",
+    render: (role) => (
+      <Tag color={role === "admin" ? "blue" : "gold"}>
+        {role === "admin" ? "Admin" : "User"}
+      </Tag>
+    ),
+  },
+  {
+    title: "Status",
+    dataIndex: "status",
+    key: "status",
+    render: (status) => (
+      // <Tag color={status === "active" ? "green" : "red"}>
+      //   {status === "active" ? "Active" : "Inactive"}
+      // </Tag>
+      <Tag color="green">
+      Active
+    </Tag>
+    ),
   },
   {
     title: 'Action',
@@ -104,7 +121,7 @@ const UserTable = () => {
   return (
     <>
       <div className='inline-flex gap-8'>
-        <div className='text-[28px]'>All Users</div>
+        <div className='text-[28px] '>All Users</div>
         <div className="relative w-[400px]">
           <FaMagnifyingGlass className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500" />
           <input
@@ -117,12 +134,14 @@ const UserTable = () => {
           />
         </div>
       </div>
-
-      <Table className='' columns={columns} dataSource={searchResults} 
-      pagination={{ pageSize: 10,
-        showTotal: (total) => `Total Users: ${total}`,
-       }} 
-      />
+      <div className='mt-4 shadow-[0px_-4px_12px_rgba(0,0,0,0.05)]'>
+        <Table className='' columns={columns} dataSource={searchResults}
+          pagination={{
+            pageSize: 10,
+            showTotal: (total) => `Total Users: ${total}`,
+          }}
+        />
+      </div>
     </>
   );
 };
