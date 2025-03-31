@@ -2,7 +2,7 @@ import React from 'react'
 import styled from 'styled-components';
 import { logoutUser } from '../../services/authService';
 import { useNavigate } from 'react-router-dom';
-import { FaSeedling, FaSignOutAlt, FaHome, FaUsers } from 'react-icons/fa';
+import { FaSeedling, FaSignOutAlt, FaHome, FaUsers, FaMicrochip } from 'react-icons/fa';
 import { Link, useLocation } from 'react-router-dom';
 import { getUserRole } from '../../routes/AppRoutes';
 
@@ -75,6 +75,18 @@ const NavBar = () => {
               </div>
             </Link> 
           ) : (<span></span> )}
+
+          { getUserRole() === 'admin' ?  (
+            <Link to="/devices-list" style={{ textDecoration: 'none', color: 'inherit' }}>
+              <div className={location.pathname === '/devices-list' ? 'bg-[#678cd9] w-[95%] rounded-[10px]' : ''}>
+                <li className="flex items-center gap-4 p-4 hover:bg-[#678cd9] w-[95%] rounded-[10px] cursor-pointer">
+                  <FaMicrochip />
+                  <span> DeviceList</span>
+                </li>
+              </div>
+            </Link> 
+          ) : (<span></span> )}
+
           <li className='flex items-center gap-4 p-4 hover:bg-[#678cd9] w-[95%] rounded-[10px] cursor-pointer' onClick={() => logoutUser(navigate)}>
             <FaSignOutAlt />
             <span>
