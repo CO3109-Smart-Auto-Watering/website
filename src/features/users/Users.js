@@ -1,4 +1,5 @@
 import React from 'react'
+import { useState } from 'react';
 import NavBar from '../../components/layout/NavBar'
 import UserTable from './UserTable';
 import styled from 'styled-components';
@@ -14,18 +15,23 @@ const MainContent = styled.div`
 `;
 
 const UserList = () => {
+    const [userCount, setUserCount] = useState(0);
+
+    const handleUserCount = (count) => {
+        setUserCount(count);
+    };
     return (
         <div className='bg-[#F5F5F5] h-[100%]'>
 
             <NavBar />
             <MainContent >
-                
+
                 <div className='flex mt-[0px] mb-[24px]'>
                     <div className='relative p-[16px] mr-[32px] bg-white w-[250px] h-[140px] [box-shadow:0px_4px_12px_rgba(0,_0,_0,_0.05)] rounded-[8px]'>
                         <div className='flex'>
                             <div>
-                                <h2 className='text-[16px] text-[#636466]'>Total Customers</h2>
-                                <h3 className='text-[28px] font-semibold'>500</h3>
+                                <h2 className='text-[16px] text-[#636466]'>Total Users</h2>
+                                <h3 className='text-[28px] font-semibold'>{userCount}</h3>
                             </div>
                             {/* <Image className='absolute right-[16px]'
                                 src={pageBalance} alt='pageBalance' width={50}></Image> */}
@@ -40,8 +46,8 @@ const UserList = () => {
                     <div className='relative p-[16px] mr-[32px] bg-white w-[250px] h-[140px] [box-shadow:0px_4px_12px_rgba(0,_0,_0,_0.05)] rounded-[8px]'>
                         <div className='flex'>
                             <div>
-                                <h2 className='text-[16px] text-[#636466]'>Total</h2>
-                                {/* <h3 className='text-[28px] font-semibold'>{totalPrinted}</h3> */}
+                                <h2 className='text-[16px] text-[#636466]'>Active Users</h2>
+                                <h3 className='text-[28px] font-semibold'>{userCount}</h3>
                             </div>
                             {/* <Image className='absolute right-[16px]'
                                 src={pagePrinted} alt='pageBalance' width={50}></Image> */}
@@ -54,8 +60,8 @@ const UserList = () => {
                         </div>
                     </div>
                 </div>
-                
-                <UserTable />
+
+                <UserTable onCountChange={handleUserCount}/>
 
             </MainContent>
         </div>

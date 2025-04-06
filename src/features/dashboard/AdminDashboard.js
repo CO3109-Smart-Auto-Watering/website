@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
+import { useReactToPrint } from "react-to-print";
 import styled from 'styled-components';
 import NavBar from '../../components/layout/NavBar';
 import { Line, Bar } from 'react-chartjs-2';
@@ -26,10 +27,11 @@ ChartJS.register(
   Legend
 );
 
-const Container = styled.div`
-  padding: 20px;
-  margin-left: 250px; /* Để tránh chồng lên NavBar */
-`;
+// const Container = styled.div`
+//   flex: 1;
+//   padding: 20px;
+//   margin-left: 250px; /* Để tránh chồng lên NavBar */
+// `;
 
 const Header = styled.h1`
   font-size: 28px;
@@ -48,9 +50,7 @@ const FilterBar = styled.div`
   margin-bottom: 20px;
   border-radius: 5px;
 
-  @media print {
-    display: none; /* Ẩn FilterBar khi in */
-  }
+
 `;
 
 const FilterSection = styled.div`
@@ -360,9 +360,9 @@ const AdminDashboard = () => {
   const totalPumpTime = mainPumpTotal + subPumpTotal;
 
   // Hàm in báo cáo
-  const handlePrint = () => {
-    window.print();
-  };
+  // const handlePrint = () => {
+  //   window.print();
+  // };
 
   // Cấu hình dữ liệu cho biểu đồ Nhiệt độ & Độ ẩm không khí (Daily)
   const tempAirHumidityChartData = {
@@ -677,12 +677,24 @@ const AdminDashboard = () => {
       },
     },
   };
+  const contentToPrintRef = useRef();
+  const handlePrint = useReactToPrint({
+    contentRef: contentToPrintRef,
+  });
+
+  const getPageMargins = () => {
+    return `@page { margin: 0 20px 0 0 !important; }`;
+  };
 
   return (
-    <>
-      <NavBar />
-      <Container>
-        <Header>Báo Cáo Thống Kê Cảm Biến</Header>
+    <div className='flex'>
+      <div className='w-[250px]'> 
+        <NavBar/>
+      </div>
+      <div className=' '>
+      <div ref={contentToPrintRef} className='flex-1  p-[20px] ' >
+      <style>{getPageMargins()}</style>
+        <Header> Báo Cáo Thống Kê Cảm Biến</Header>
         <FilterBar>
           <div>Dữ liệu cảm biến và hoạt động máy bơm</div>
           <FilterSection>
@@ -690,10 +702,10 @@ const AdminDashboard = () => {
               Từ ngày: <DateInput type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
               Đến ngày: <DateInput type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
             </div>
-            <Button primary onClick={filterData}>Lọc dữ liệu</Button>
-            <Button onClick={handlePrint}>In báo cáo</Button>
+            <Button className='no-print' primary onClick={filterData}>Lọc dữ liệu</Button>
+            <Button className='no-print' onClick={() => handlePrint()}>In báo cáo</Button>
           </FilterSection>
-          <div>Thời gian: {currentDate}</div>
+          <div className='no-print'>Thời gian: {currentDate}</div>
         </FilterBar>
         <ChartRow>
           <div style={{ flex: 1 }}>
@@ -747,8 +759,8 @@ const AdminDashboard = () => {
           <div>Dữ liệu cảm biến theo giờ</div>
           <FilterSection>
             <div>
-              Chọn ngày: 
-              <SelectInput value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)}>
+              <span className='no-print'>Chọn ngày: </span>
+              <SelectInput className='no-print' value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)}>
                 {filteredData.labelsDaily.map((label, index) => (
                   <option key={index} value={initialData.labelsDaily[initialData.labelsDaily.findIndex(date => date.slice(5) === label)]}>
                     {label}
@@ -757,7 +769,7 @@ const AdminDashboard = () => {
               </SelectInput>
               Từ giờ: <TimeInput type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
               Đến giờ: <TimeInput type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
-              <Button primary onClick={filterHourlyData}>Lọc dữ liệu</Button>
+              <Button className='no-print' primary onClick={filterHourlyData}>Lọc dữ liệu</Button>
             </div>
           </FilterSection>
           <div>Ngày: {selectedDate.slice(5)}</div>
@@ -776,8 +788,9 @@ const AdminDashboard = () => {
             </ChartContainer>
           </ChartWrapper>
         </ChartRow>
-      </Container>
-    </>
+      </div>
+      </div>
+    </div>
   );
 };
 

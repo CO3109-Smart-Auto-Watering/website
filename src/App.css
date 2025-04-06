@@ -23,3 +23,24 @@ body {
     padding: 20px;
   }
 }
+
+@media print {
+  body {
+    background: white;
+    color: black;
+    font-size: 14px;
+  }
+
+  .filter-section {
+    border: none;
+    box-shadow: none;
+  }
+
+  .no-print {
+    display: none !important; 
+  }
+
+  .container {
+    margin-left: 0 !important; 
+  }
+}

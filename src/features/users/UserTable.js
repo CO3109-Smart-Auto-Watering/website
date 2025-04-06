@@ -39,8 +39,8 @@ const columns = [
       //   {status === "active" ? "Active" : "Inactive"}
       // </Tag>
       <Tag color="green">
-      Active
-    </Tag>
+        Active
+      </Tag>
     ),
   },
   {
@@ -54,7 +54,7 @@ const columns = [
   },
 ];
 
-const UserTable = () => {
+const UserTable = ({ onCountChange }) => {
   // Gửi request đến API
   const [users, setUsers] = useState([]);
   const [searchResults, setSearchResults] = useState([]);
@@ -84,6 +84,9 @@ const UserTable = () => {
         const data = await response.json();
         setUsers(data);
         setSearchResults(data); // Initialize search results with all data
+        
+        const count = data.length; // hoặc data.count nếu API trả vậy
+        onCountChange(count); // gọi hàm từ cha để gửi lên
       } catch (err) {
         setError(err.message);
       } finally {
