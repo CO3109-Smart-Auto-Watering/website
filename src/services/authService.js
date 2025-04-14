@@ -3,15 +3,14 @@ import axios from 'axios';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
-// Create axios instance with base URL
 const api = axios.create({
   baseURL: API_URL,
   headers: {
-    'Content-Type': 'application/json'
+    'Content-Type': 'application/json',
   }
 });
 
-// Add token to requests if available
+// Thêm interceptor để tự động thêm token vào header
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
@@ -25,76 +24,102 @@ api.interceptors.request.use(
   }
 );
 
-// Login user
+// Đăng nhập
 export const loginUser = async (userData) => {
   try {
-    const response = await api.post('/login', userData);
+    const response = await api.post('/auth/login', userData);
     return response.data;
   } catch (error) {
     throw error;
   }
 };
 
-// Register user
+// Đăng ký
 export const registerUser = async (userData) => {
   try {
-    const response = await api.post('/register', userData);
+    const response = await api.post('/auth/register', userData);
     return response.data;
   } catch (error) {
     throw error;
   }
 };
 
-// Forgot password
-export const forgotPassword = async (userData) => {
+// Quên mật khẩu
+export const forgotPassword = async (email) => {
   try {
-    const response = await api.post('/forgot-password', userData);
+    let payload;
+    
+    if (typeof email === 'string') {
+      payload = { email }; 
+    } else {
+      payload = email; 
+    }
+    
+    const response = await api.post('/auth/forgot-password', payload);
     return response.data;
   } catch (error) {
     throw error;
   }
 };
 
-//validateResetToken
+// Xác thực token reset mật khẩu
 export const validateResetToken = async (token) => {
   try {
-    const response = await api.get(`/reset-password/validate/${token}`);
+    const response = await api.get(`/auth/reset-password/validate/${token}`);
     return response.data;
   } catch (error) {
     throw error;
   }
 };
 
-// Reset password
-export const resetPassword = async (token, newPassword) => {
+// Reset mật khẩu
+export const resetPassword = async (token, password) => {
   try {
-    const response = await api.post(`/reset-password/${token}`, { password: newPassword });
+    const response = await api.post(`/auth/reset-password/${token}`, { password });
     return response.data;
   } catch (error) {
     throw error;
   }
 };
 
-// Get current user
+// Lấy thông tin người dùng hiện tại
 export const getCurrentUser = async () => {
   try {
-    const response = await api.get('/user');
+    const response = await api.get('/auth/me');
     return response.data;
   } catch (error) {
     throw error;
   }
 };
 
-// Logout user
+// Đăng xuất
 export const logoutUser = () => {
   localStorage.removeItem('token');
+  localStorage.removeItem('refreshToken');
+  // Các bước đăng xuất khác
 };
 
-// Check if user is authenticated
+// Kiểm tra token hợp lệ
+export const verifyToken = async () => {
+  try {
+    const response = await api.post('/auth/verify');
+    return response.data;
+  } catch (error) {
+    // Nếu token không hợp lệ, xóa token và trả về false
+    if (error.response && error.response.status === 401) {
+      localStorage.removeItem('token');
+    }
+    throw error;
+  }
+};
+
+// Kiểm tra xem người dùng đã đăng nhập hay chưa
 export const isAuthenticated = () => {
   const token = localStorage.getItem('token');
   return !!token;
 };
+
+
 
 const authService = {
   loginUser,

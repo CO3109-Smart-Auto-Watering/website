@@ -1,47 +1,105 @@
 import React, { useState, useEffect } from 'react';
 import { ResponsiveContainer, LineChart, CartesianGrid, XAxis, YAxis, Tooltip, Legend, Line } from 'recharts';
+import { getHistoricalData } from '../../services/sensorService';
 
 const SensorChart = () => {
   const [data, setData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    const fetchSensorData = async (feedName) => {
+    const fetchHistoricalData = async () => {
       try {
-        const response = await fetch(
-          `https://io.adafruit.com/api/v2/${process.env.REACT_APP_AIO_USERNAME}/feeds/${feedName}/data?limit=1`,
-          {
-            headers: { 'X-AIO-Key': process.env.REACT_APP_AIO_KEY },
+        setLoading(true);
+        
+        // Get historical data for each sensor (last 24 data points)
+        const tempResponse = await getHistoricalData('sensor-temp', 24);
+        const humidityResponse = await getHistoricalData('sensor-humidity', 24);
+        const soilResponse = await getHistoricalData('sensor-soil', 24);
+        
+        // Extract the actual data arrays from the response
+        const tempData = tempResponse.data || [];
+        const humidityData = humidityResponse.data || [];
+        const soilData = soilResponse.data || [];
+        
+        console.log("Temp data:", tempData);
+        console.log("Humidity data:", humidityData);
+        console.log("Soil data:", soilData);
+        
+        // Create a map to combine data by timestamp
+        const dataMap = {};
+        
+        // Process temperature data
+        tempData.forEach(item => {
+          const timestamp = new Date(item.createdAt);
+          const timeKey = timestamp.toISOString();
+          const timeDisplay = timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          
+          dataMap[timeKey] = {
+            time: timeDisplay,
+            temperature: parseFloat(item.value),
+          };
+        });
+        
+        // Process humidity data
+        humidityData.forEach(item => {
+          const timestamp = new Date(item.createdAt);
+          const timeKey = timestamp.toISOString();
+          const timeDisplay = timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          
+          if (dataMap[timeKey]) {
+            dataMap[timeKey].humidity = parseFloat(item.value);
+          } else {
+            dataMap[timeKey] = {
+              time: timeDisplay,
+              humidity: parseFloat(item.value),
+            };
           }
-        );
-        const jsonData = await response.json();
-        return jsonData.length > 0 ? parseFloat(jsonData[0].value) : null;
+        });
+        
+        // Process soil moisture data
+        soilData.forEach(item => {
+          const timestamp = new Date(item.createdAt);
+          const timeKey = timestamp.toISOString();
+          const timeDisplay = timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          
+          if (dataMap[timeKey]) {
+            dataMap[timeKey].soilMoisture = parseFloat(item.value);
+          } else {
+            dataMap[timeKey] = {
+              time: timeDisplay,
+              soilMoisture: parseFloat(item.value),
+            };
+          }
+        });
+        
+        // Convert to array and sort by timestamp
+        const combinedData = Object.values(dataMap).sort((a, b) => {
+          return new Date(a.time) - new Date(b.time);
+        });
+        
+        console.log("Combined data for chart:", combinedData);
+        setData(combinedData);
       } catch (error) {
-        console.error(`Error fetching ${feedName}:`, error);
-        return null;
+        console.error('Error fetching historical data:', error);
+        setError(error.message);
+      } finally {
+        setLoading(false);
       }
     };
 
-    const fetchData = async () => {
-      const temperature = await fetchSensorData('sensor-temp');
-      const humidity = await fetchSensorData('sensor-humidity');
-      const soilMoisture = await fetchSensorData('sensor-soil');
-
-      const newDataPoint = {
-        time: new Date().toLocaleTimeString(),
-        temperature,
-        humidity,
-        soilMoisture,
-      };
-
-      // Cập nhật state với 10 bản ghi cuối cùng
-      setData(prevData => [...prevData, newDataPoint].slice(-10));
-    };
-
-    // Lấy dữ liệu ngay khi component mount và cập nhật mỗi 5 giây
-    fetchData();
-    const intervalId = setInterval(fetchData, 5000);
+    fetchHistoricalData();
+    const intervalId = setInterval(fetchHistoricalData, 60000); // Update every minute
     return () => clearInterval(intervalId);
   }, []);
+
+  if (error) return <div>Error loading chart data: {error}</div>;
+  if (loading && data.length === 0) return <div>Loading chart data...</div>;
+  
+  // If no data available, show message
+  if (data.length === 0) {
+    return <div>No historical data available</div>;
+  }
 
   return (
     <ResponsiveContainer width="100%" height={300}>

@@ -10,18 +10,23 @@ const Header = styled.h2`
   font-size: 24px;
   font-weight: bold;
   margin-bottom: 30px;
-  color: #333;
+  color: ${props => props.theme?.palette?.mode === 'dark' ? '#ffffff' : '#333'};
 `;
 
+// Phần styled component ToggleForm
 const ToggleForm = styled.div`
   text-align: center;
   font-size: 14px;
-  color: #666;
+  color: ${props => props.theme?.palette?.mode === 'dark' ? 'rgba(255, 255, 255, 0.7)' : '#666'};
   
   a {
-    color: #4975d1;
+    color: ${props => props.theme?.palette?.mode === 'dark' ? '#81c784' : '#4a7e2a'};
     text-decoration: none;
     font-weight: bold;
+    
+    &:hover {
+      text-decoration: underline;
+    }
   }
 `;
 

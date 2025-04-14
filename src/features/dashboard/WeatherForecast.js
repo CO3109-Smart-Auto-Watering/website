@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
+import { useTheme } from '@mui/material';
 
 const ForecastContainer = styled.div`
   display: flex;
@@ -7,6 +8,26 @@ const ForecastContainer = styled.div`
   gap: 16px;
   padding: 8px 0;
   margin-top: 16px;
+  
+  /* Tạo scrollbar nhẹ nhàng hơn cho cả hai chế độ */
+  &::-webkit-scrollbar {
+    height: 4px;
+  }
+  
+  &::-webkit-scrollbar-track {
+    background: ${props => props.theme.palette.mode === 'dark' 
+      ? 'rgba(255,255,255,0.05)' 
+      : 'rgba(0,0,0,0.05)'
+    };
+  }
+  
+  &::-webkit-scrollbar-thumb {
+    background: ${props => props.theme.palette.mode === 'dark' 
+      ? 'rgba(255,255,255,0.2)' 
+      : 'rgba(0,0,0,0.1)'
+    };
+    border-radius: 4px;
+  }
 `;
 
 const ForecastItem = styled.div`
@@ -14,24 +35,31 @@ const ForecastItem = styled.div`
   flex-direction: column;
   align-items: center;
   min-width: 120px;
-  background: #f5f5f5;
+  background: ${props => props.theme.palette.mode === 'dark' 
+    ? props.theme.palette.background.default
+    : '#f5f5f5'
+  };
   padding: 12px;
   border-radius: 8px;
+  border: 1px solid ${props => props.theme.palette.divider};
+  transition: background-color 0.3s ease, border-color 0.3s ease;
 `;
 
 const DayLabel = styled.div`
   font-weight: bold;
   margin-bottom: 8px;
   font-size: 16px;
+  color: ${props => props.theme.palette.text.primary};
 `;
 
 const TempInfo = styled.div`
   font-size: 14px;
+  color: ${props => props.theme.palette.text.primary};
 `;
 
 const RainInfo = styled.div`
   font-size: 14px;
-  color: #666;
+  color: ${props => props.theme.palette.text.secondary};
 `;
 
 const IconDisplay = styled.div`
@@ -40,12 +68,14 @@ const IconDisplay = styled.div`
 `;
 
 const WeatherForecastSummary = () => {
+  const theme = useTheme();
   const [dailyForecasts, setDailyForecasts] = useState([]);
   const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(true);
   
   // Sử dụng thành phố Ho Chi Minh
   const city = 'Ho Chi Minh';
-  const API_KEY = process.env.REACT_APP_WEATHER_API_KEY;
+  const API_KEY = process.env.REACT_APP_WEATHER_API_KEY || 'your-api-key-fallback';
 
   // Mapping từ mã icon của OpenWeatherMap sang emoji
   const emojiMapping = {
@@ -72,12 +102,15 @@ const WeatherForecastSummary = () => {
   useEffect(() => {
     const fetchForecast = async () => {
       try {
+        setLoading(true);
         const response = await fetch(
           `https://api.openweathermap.org/data/2.5/forecast?q=${city}&appid=${API_KEY}&units=metric`
         );
+        
         if (!response.ok) {
           throw new Error('Không thể lấy dữ liệu dự báo thời tiết');
         }
+        
         const data = await response.json();
         
         // Nhóm dữ liệu theo ngày (định dạng yyyy-mm-dd)
@@ -118,23 +151,47 @@ const WeatherForecastSummary = () => {
       } catch (err) {
         console.error(err);
         setError(err.message);
+      } finally {
+        setLoading(false);
       }
     };
+    
     fetchForecast();
   }, [city, API_KEY]);
 
-  if (error) return <div>Error: {error}</div>;
-  if (dailyForecasts.length === 0) return <div>Đang tải dự báo thời tiết...</div>;
+  if (error) {
+    return (
+      <div style={{ 
+        color: theme.palette.error.main, 
+        padding: '16px', 
+        textAlign: 'center'
+      }}>
+        Lỗi: {error}
+      </div>
+    );
+  }
+  
+  if (loading) {
+    return (
+      <div style={{ 
+        color: theme.palette.text.secondary, 
+        padding: '16px', 
+        textAlign: 'center'
+      }}>
+        Đang tải dự báo thời tiết...
+      </div>
+    );
+  }
 
   return (
-    <ForecastContainer>
+    <ForecastContainer theme={theme}>
       {dailyForecasts.map((day, index) => (
-        <ForecastItem key={index}>
-          <DayLabel>{day.date}</DayLabel>
+        <ForecastItem key={index} theme={theme}>
+          <DayLabel theme={theme}>{day.date}</DayLabel>
           <IconDisplay>{day.icon}</IconDisplay>
-          <TempInfo>Cao: {day.maxTemp}°C</TempInfo>
-          <TempInfo>Thấp: {day.minTemp}°C</TempInfo>
-          <RainInfo>Có mưa: {day.rainChance}%</RainInfo>
+          <TempInfo theme={theme}>Cao: {day.maxTemp}°C</TempInfo>
+          <TempInfo theme={theme}>Thấp: {day.minTemp}°C</TempInfo>
+          <RainInfo theme={theme}>Có mưa: {day.rainChance}%</RainInfo>
         </ForecastItem>
       ))}
     </ForecastContainer>
