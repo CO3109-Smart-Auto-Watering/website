@@ -119,3 +119,13 @@ export const getUnassignedDevices = async () => {
     throw error;
   }
 };
+
+export const getDeviceAreaMapping = async () => {
+  try {
+    const response = await api.get('/devices/area-mapping');
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching device-area mappings:', error);
+    throw error;
+  }
+};

@@ -102,3 +102,4 @@ export const updateDeviceInArea = async (areaId, data) => {
     throw error;
   }
 };
+

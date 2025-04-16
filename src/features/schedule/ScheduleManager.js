@@ -4,7 +4,7 @@ import {
   FormControl, InputLabel, MenuItem, Select, FormControlLabel,
   Switch, Box, Paper, Chip, IconButton, Alert, Snackbar,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-  Divider, CircularProgress
+  Divider, CircularProgress, FormHelperText
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
@@ -13,12 +13,14 @@ import PauseIcon from '@mui/icons-material/Pause';
 import WaterDropIcon from '@mui/icons-material/WaterDrop';
 import DevicesIcon from '@mui/icons-material/Devices';
 import GrassIcon from '@mui/icons-material/Grass';
+import ErrorIcon from '@mui/icons-material/Error';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import { format, isAfter, isBefore, addMinutes } from 'date-fns';
 import { 
   getAllSchedules, createSchedule, updateSchedule,
   deleteSchedule, toggleScheduleStatus 
 } from '../../services/scheduleService';
-import { getUserDevices } from '../../services/deviceService';
+import { getUserDevices, getDeviceAreaMapping } from '../../services/deviceService';
 import { getAreas } from '../../services/areaService';
 
 const ScheduleManager = () => {
@@ -40,6 +42,8 @@ const ScheduleManager = () => {
   const [selectedDevice, setSelectedDevice] = useState('');
   const [selectedArea, setSelectedArea] = useState('');
   const [selectedPlantIndex, setSelectedPlantIndex] = useState(-1);
+  const [deviceAreaMap, setDeviceAreaMap] = useState({});
+  const [selectedDeviceActive, setSelectedDeviceActive] = useState(false);
   
   // UI states
   const [schedules, setSchedules] = useState([]);
@@ -62,11 +66,19 @@ const ScheduleManager = () => {
     fetchSchedules();
     fetchDevices();
     fetchAreas();
-    
+    fetchDeviceAreaMapping();
+
     // Set up interval to refresh schedules every minute
     const interval = setInterval(fetchSchedules, 60000);
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    if (selectedDevice && deviceAreaMap[selectedDevice]) {
+      setSelectedArea(deviceAreaMap[selectedDevice].areaId);
+      setSelectedPlantIndex(deviceAreaMap[selectedDevice].plantIndex);
+    }
+  }, [selectedDevice, deviceAreaMap]);
 
   // Fetch all user schedules
   const fetchSchedules = async () => {
@@ -113,11 +125,44 @@ const ScheduleManager = () => {
     }
   };
 
-  // Handle area change
-  const handleAreaChange = (e) => {
-    const areaId = e.target.value;
-    setSelectedArea(areaId);
-    setSelectedPlantIndex(-1); // Reset plant selection when area changes
+  const fetchDeviceAreaMapping = async () => {
+    try {
+      const response = await getDeviceAreaMapping();
+      
+      if (response.success) {
+        // Tạo map từ deviceId -> { areaId, plantIndex }
+        const mapping = {};
+        response.mappings.forEach(item => {
+          mapping[item.deviceId] = {
+            areaId: item.areaId,
+            plantIndex: item.plantIndex !== undefined ? item.plantIndex : -1
+          };
+        });
+        setDeviceAreaMap(mapping);
+      }
+    } catch (error) {
+      console.error("Error fetching device-area mappings:", error);
+    }
+  };
+  
+  //Handle Device change
+  const handleDeviceChange = (e) => {
+    const deviceId = e.target.value;
+    setSelectedDevice(deviceId);
+    
+    // Tìm thiết bị trong danh sách để kiểm tra trạng thái hoạt động
+    const device = devices.find(d => d.deviceId === deviceId);
+    setSelectedDeviceActive(device ? device.isActive : false);
+    
+    // Tự động cập nhật khu vực và cây trồng nếu thiết bị đã được gắn với khu vực
+    if (deviceAreaMap[deviceId]) {
+      setSelectedArea(deviceAreaMap[deviceId].areaId);
+      setSelectedPlantIndex(deviceAreaMap[deviceId].plantIndex);
+    } else {
+      // Nếu thiết bị chưa được gắn với khu vực nào, reset các selection
+      setSelectedArea('');
+      setSelectedPlantIndex(-1);
+    }
   };
 
   // Handle form submission
@@ -130,6 +175,14 @@ const ScheduleManager = () => {
       // Validate device
       if (!selectedDevice) {
         showAlert("Vui lòng chọn thiết bị bơm nước", "error");
+        setLoading(false);
+        return;
+      }
+      
+      // Kiểm tra thiết bị có đang hoạt động không
+      const device = devices.find(d => d.deviceId === selectedDevice);
+      if (!device || !device.isActive) {
+        showAlert("Thiết bị đang không hoạt động. Không thể tạo lịch tưới.", "error");
         setLoading(false);
         return;
       }
@@ -222,8 +275,19 @@ const ScheduleManager = () => {
     setDuration(schedule.duration);
     setScheduleType(schedule.scheduleType);
     setSelectedDevice(schedule.deviceId || '');
-    setSelectedArea(schedule.areaId || '');
-    setSelectedPlantIndex(schedule.plantIndex !== undefined ? schedule.plantIndex : -1);
+    
+    // Tự động cập nhật khu vực và cây trồng dựa trên deviceId
+    if (schedule.deviceId && deviceAreaMap[schedule.deviceId]) {
+      setSelectedArea(deviceAreaMap[schedule.deviceId].areaId);
+      setSelectedPlantIndex(deviceAreaMap[schedule.deviceId].plantIndex);
+    } else {
+      setSelectedArea(schedule.areaId || '');
+      setSelectedPlantIndex(schedule.plantIndex !== undefined ? schedule.plantIndex : -1);
+    }
+    
+    // Kiểm tra trạng thái hoạt động của thiết bị
+    const device = devices.find(d => d.deviceId === schedule.deviceId);
+    setSelectedDeviceActive(device ? device.isActive : false);
     
     if (schedule.scheduleType === 'onetime') {
       // Format date to local datetime-local input format
@@ -254,6 +318,7 @@ const ScheduleManager = () => {
     setSelectedDevice('');
     setSelectedArea('');
     setSelectedPlantIndex(-1);
+    setSelectedDeviceActive(false);
   };
 
   // Show alert message
@@ -367,135 +432,238 @@ const ScheduleManager = () => {
     return area.plants[plantIndex].name;
   };
 
+  // Lấy thông tin khu vực và cây trồng của thiết bị đã chọn
+  const getSelectedDeviceAreaAndPlant = () => {
+    if (!selectedDevice) return { areaName: '', plantName: '' };
+    
+    const areaName = getAreaName(selectedArea);
+    const plantName = getPlantName(selectedArea, selectedPlantIndex);
+    
+    return { areaName, plantName };
+  };
+
   return (
     <div>
       <Typography variant="h4" gutterBottom>
         Quản lý lịch tưới cây
       </Typography>
       
-      <Card>
+      <Card elevation={3} sx={{ mb: 4 }}>
         <CardContent>
-          <Typography variant="h6" gutterBottom>
+          <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', mb: 3, color: 'primary.main' }}>
+            {editMode ? (
+              <EditIcon sx={{ mr: 1 }} />
+            ) : (
+              <Box component="span" sx={{ mr: 1, fontSize: '1.5rem' }}>+</Box>
+            )}
             {editMode ? 'Sửa lịch tưới' : 'Tạo lịch tưới mới'}
           </Typography>
           
           <form onSubmit={handleSubmit}>
-            <Grid container spacing={3}>
-              <Grid item xs={12}>
+            <Box sx={{ 
+              display: 'flex', 
+              flexDirection: 'column', 
+              gap: 3 
+            }}>
+              {/* PHẦN 1: THÔNG TIN CƠ BẢN */}
+              <Paper 
+                elevation={0} 
+                variant="outlined" 
+                sx={{ p: 2, borderRadius: 2 }}
+              >
+                <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 'medium', color: 'text.secondary' }}>
+                  Thông tin cơ bản
+                </Typography>
+                
                 <TextField
                   label="Tên lịch tưới"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   fullWidth
                   required
+                  sx={{ mb: 2 }}
+                  placeholder="Nhập tên lịch tưới..."
                 />
-              </Grid>
+                
+                <Grid container spacing={2}>
+                  <Grid item xs={12} sm={6}>
+                    <FormControl fullWidth>
+                      <InputLabel>Loại lịch</InputLabel>
+                      <Select
+                        value={scheduleType}
+                        onChange={(e) => setScheduleType(e.target.value)}
+                        label="Loại lịch"
+                      >
+                        <MenuItem value="onetime">Một lần</MenuItem>
+                        <MenuItem value="recurring">Hàng tuần</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                  
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      label="Thời gian tưới (phút)"
+                      type="number"
+                      value={duration}
+                      onChange={(e) => setDuration(e.target.value)}
+                      inputProps={{ min: 1, max: 120 }}
+                      fullWidth
+                      required
+                      helperText="Thời gian tưới tối đa 120 phút"
+                    />
+                  </Grid>
+                </Grid>
+              </Paper>
               
-              {/* Device selection */}
-              <Grid item xs={12} sm={6}>
-                <FormControl fullWidth required>
+              {/* PHẦN 2: CHỌN THIẾT BỊ */}
+              <Paper 
+                elevation={0} 
+                variant="outlined" 
+                sx={{ p: 2, borderRadius: 2 }}
+              >
+                <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 'medium', color: 'text.secondary' }}>
+                  Thiết bị và khu vực
+                </Typography>
+                
+                <FormControl fullWidth required sx={{ mb: 2 }}>
                   <InputLabel>Thiết bị bơm nước</InputLabel>
                   <Select
                     value={selectedDevice}
-                    onChange={(e) => setSelectedDevice(e.target.value)}
+                    onChange={handleDeviceChange} 
                     label="Thiết bị bơm nước"
                   >
                     {devices
                       .filter(device => device.feeds && device.feeds.includes('pump-motor'))
                       .map(device => (
                         <MenuItem key={device.deviceId} value={device.deviceId}>
-                          <Box display="flex" alignItems="center">
-                            <DevicesIcon sx={{ mr: 1, color: 'primary.main' }} />
-                            {device.deviceName}
+                          <Box display="flex" alignItems="center" width="100%" justifyContent="space-between">
+                            <Box display="flex" alignItems="center">
+                              <DevicesIcon sx={{ mr: 1, color: device.isActive ? 'primary.main' : 'text.disabled' }} />
+                              {device.deviceName}
+                            </Box>
+                            {device.isActive ? 
+                              <Chip 
+                                icon={<CheckCircleIcon />} 
+                                label="Hoạt động" 
+                                size="small" 
+                                color="success" 
+                                sx={{ ml: 2 }}
+                              /> : 
+                              <Chip 
+                                icon={<ErrorIcon />} 
+                                label="Không hoạt động" 
+                                size="small" 
+                                color="error" 
+                                sx={{ ml: 2 }}
+                              />
+                            }
                           </Box>
                         </MenuItem>
                       ))}
                   </Select>
                 </FormControl>
-              </Grid>
-              
-              <Grid item xs={12} sm={6}>
-                <FormControl fullWidth>
-                  <InputLabel>Loại lịch</InputLabel>
-                  <Select
-                    value={scheduleType}
-                    onChange={(e) => setScheduleType(e.target.value)}
-                    label="Loại lịch"
+                
+                {/* Hiển thị thông tin thiết bị khi đã chọn */}
+                {selectedDevice && (
+                  <Box 
+                    sx={{ 
+                      mt: 2,
+                      p: 2, 
+                      borderRadius: 2,
+                      border: '1px solid',
+                      borderColor: selectedDeviceActive ? 'success.light' : 'error.light',
+                      bgcolor: selectedDeviceActive ? 'success.50' : 'error.50',
+                      transition: 'all 0.3s ease-in-out',
+                    }}
                   >
-                    <MenuItem value="onetime">Một lần</MenuItem>
-                    <MenuItem value="recurring">Hàng tuần</MenuItem>
-                  </Select>
-                </FormControl>
-              </Grid>
-              
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  label="Thời gian tưới (phút)"
-                  type="number"
-                  value={duration}
-                  onChange={(e) => setDuration(e.target.value)}
-                  inputProps={{ min: 1, max: 120 }}
-                  fullWidth
-                  required
-                />
-              </Grid>
-              
-              {/* Area selection */}
-              <Grid item xs={12} sm={6}>
-                <FormControl fullWidth>
-                  <InputLabel>Khu vực</InputLabel>
-                  <Select
-                    value={selectedArea}
-                    onChange={handleAreaChange}
-                    label="Khu vực"
-                  >
-                    <MenuItem value="">
-                      <em>Không chọn khu vực</em>
-                    </MenuItem>
-                    {areas.map(area => (
-                      <MenuItem key={area._id} value={area._id}>
-                        <Box display="flex" alignItems="center">
-                          <GrassIcon sx={{ mr: 1, color: 'success.main' }} />
-                          {area.name}
-                        </Box>
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
-              
-              {/* Plant selection (only show if area is selected) */}
-              {selectedArea && (
-                <Grid item xs={12}>
-                  <FormControl fullWidth>
-                    <InputLabel>Cây trồng</InputLabel>
-                    <Select
-                      value={selectedPlantIndex}
-                      onChange={(e) => setSelectedPlantIndex(e.target.value)}
-                      label="Cây trồng"
+                    {/* Trạng thái thiết bị */}
+                    <Box 
+                      sx={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        mb: 2,
+                        pb: 2,
+                        borderBottom: '1px dashed',
+                        borderColor: selectedDeviceActive ? 'success.light' : 'error.light',
+                      }}
                     >
-                      <MenuItem value={-1}>
-                        <em>Tưới cho toàn bộ khu vực</em>
-                      </MenuItem>
-                      {areas
-                        .find(area => area._id === selectedArea)?.plants
-                        .map((plant, index) => (
-                          <MenuItem key={index} value={index}>
-                            <Box display="flex" alignItems="center">
-                              <WaterDropIcon sx={{ mr: 1, color: 'primary.main' }} />
-                              {plant.name}
-                            </Box>
-                          </MenuItem>
-                        )) || []}
-                    </Select>
-                  </FormControl>
-                </Grid>
-              )}
+                      <Box sx={{ mr: 2 }}>
+                        {selectedDeviceActive ? 
+                          <CheckCircleIcon sx={{ fontSize: 36, color: 'success.main' }} /> : 
+                          <ErrorIcon sx={{ fontSize: 36, color: 'error.main' }} />
+                        }
+                      </Box>
+                      <Box>
+                        <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
+                          {getDeviceName(selectedDevice)}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          {selectedDeviceActive ? 
+                            "Thiết bị đang hoạt động bình thường" : 
+                            "Thiết bị không hoạt động, không thể tạo lịch mới"
+                          }
+                        </Typography>
+                      </Box>
+                    </Box>
+                    
+                    {/* Thông tin khu vực */}
+                    <Typography variant="subtitle2" sx={{ fontWeight: 'medium', mb: 1 }}>
+                      Thông tin khu vực và cây trồng:
+                    </Typography>
+                    
+                    {selectedArea ? (
+                      <Box sx={{ 
+                        display: 'flex',
+                        flexDirection: 'column',
+                        p: 1.5,
+                        bgcolor: 'background.paper',
+                        borderRadius: 1,
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                      }}>
+                        <Box display="flex" alignItems="center" sx={{ mb: 0.5 }}>
+                          <GrassIcon sx={{ mr: 1, color: 'success.main' }} />
+                          <Typography sx={{ fontWeight: 'medium' }}>
+                            {getSelectedDeviceAreaAndPlant().areaName}
+                          </Typography>
+                        </Box>
+                        
+                        {getSelectedDeviceAreaAndPlant().plantName ? (
+                          <Box display="flex" alignItems="center" ml={3} mt={0.5}>
+                            <WaterDropIcon sx={{ mr: 1, color: 'info.main' }} />
+                            <Typography variant="body2" sx={{ fontWeight: 'medium', color: 'info.dark' }}>
+                              {getSelectedDeviceAreaAndPlant().plantName}
+                            </Typography>
+                          </Box>
+                        ) : (
+                          <Box display="flex" alignItems="center" ml={3} mt={0.5}>
+                            <Typography variant="body2" color="text.secondary">
+                              Tưới cho toàn bộ khu vực
+                            </Typography>
+                          </Box>
+                        )}
+                      </Box>
+                    ) : (
+                      <Alert severity="info" sx={{ mt: 1 }}>
+                        Thiết bị chưa được liên kết với khu vực nào. Hãy liên kết thiết bị với khu vực trước khi tạo lịch tưới.
+                      </Alert>
+                    )}
+                  </Box>
+                )}
+              </Paper>
               
-              {scheduleType === 'onetime' ? (
-                <Grid item xs={12}>
+              {/* PHẦN 3: CẤU HÌNH THỜI GIAN */}
+              <Paper 
+                elevation={0} 
+                variant="outlined" 
+                sx={{ p: 2, borderRadius: 2 }}
+              >
+                <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 'medium', color: 'text.secondary' }}>
+                  Cấu hình thời gian
+                </Typography>
+                
+                {scheduleType === 'onetime' ? (
                   <TextField
-                    label="Thời gian"
+                    label="Thời gian tưới"
                     type="datetime-local"
                     value={scheduledDateTime}
                     onChange={(e) => setScheduledDateTime(e.target.value)}
@@ -504,70 +672,80 @@ const ScheduleManager = () => {
                     }}
                     fullWidth
                     required
+                    helperText="Chọn thời điểm bắt đầu tưới"
                   />
-                </Grid>
-              ) : (
-                <>
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      label="Giờ bắt đầu"
-                      type="time"
-                      value={startTime}
-                      onChange={(e) => setStartTime(e.target.value)}
-                      InputLabelProps={{
-                        shrink: true,
-                      }}
-                      fullWidth
-                      required
-                    />
+                ) : (
+                  <Grid container spacing={2}>
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        label="Giờ bắt đầu"
+                        type="time"
+                        value={startTime}
+                        onChange={(e) => setStartTime(e.target.value)}
+                        InputLabelProps={{
+                          shrink: true,
+                        }}
+                        fullWidth
+                        required
+                        helperText="Giờ bắt đầu tưới hàng ngày"
+                      />
+                    </Grid>
+                    
+                    <Grid item xs={12} sm={6}>
+                      <FormControl fullWidth>
+                        <InputLabel>Ngày trong tuần</InputLabel>
+                        <Select
+                          multiple
+                          value={daysOfWeek}
+                          onChange={(e) => setDaysOfWeek(e.target.value)}
+                          renderValue={(selected) => (
+                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                              {selected.map((value) => (
+                                <Chip key={value} label={getDayName(value)} size="small" />
+                              ))}
+                            </Box>
+                          )}
+                          label="Ngày trong tuần"
+                        >
+                          {[0, 1, 2, 3, 4, 5, 6].map((day) => (
+                            <MenuItem key={day} value={day}>
+                              {getDayName(day)}
+                            </MenuItem>
+                          ))}
+                        </Select>
+                        <FormHelperText>Chọn các ngày trong tuần cần tưới</FormHelperText>
+                      </FormControl>
+                    </Grid>
                   </Grid>
-                  
-                  <Grid item xs={12} sm={6}>
-                    <FormControl fullWidth>
-                      <InputLabel>Ngày trong tuần</InputLabel>
-                      <Select
-                        multiple
-                        value={daysOfWeek}
-                        onChange={(e) => setDaysOfWeek(e.target.value)}
-                        renderValue={(selected) => (
-                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                            {selected.map((value) => (
-                              <Chip key={value} label={getDayName(value)} />
-                            ))}
-                          </Box>
-                        )}
-                        label="Ngày trong tuần"
-                      >
-                        {[0, 1, 2, 3, 4, 5, 6].map((day) => (
-                          <MenuItem key={day} value={day}>
-                            {getDayName(day)}
-                          </MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
-                  </Grid>
-                </>
-              )}
+                )}
+              </Paper>
               
-              <Grid item xs={12}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <Button
-                    variant="outlined"
-                    onClick={resetForm}
-                  >
-                    Hủy
-                  </Button>
-                  <Button
-                    type="submit"
-                    variant="contained"
-                    color="primary"
-                    disabled={loading}
-                  >
-                    {loading ? 'Đang xử lý...' : (editMode ? 'Cập nhật' : 'Tạo lịch')}
-                  </Button>
-                </Box>
-              </Grid>
-            </Grid>
+              {/* PHẦN 4: NÚT HÀNH ĐỘNG */}
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 2 }}>
+                <Button
+                  variant="outlined"
+                  onClick={resetForm}
+                  startIcon={<DeleteIcon />}
+                  sx={{ px: 3 }}
+                >
+                  Hủy
+                </Button>
+                <Button
+                  type="submit"
+                  variant="contained"
+                  color="primary"
+                  disabled={loading || !selectedDeviceActive}
+                  startIcon={editMode ? <EditIcon /> : <PlayArrowIcon />}
+                  sx={{ px: 3 }}
+                >
+                  {loading ? (
+                    <CircularProgress size={24} color="inherit" />
+                  ) : (
+                    editMode ? 'Cập nhật' : 'Tạo lịch'
+                  )}
+                </Button>
+              </Box>
+            </Box>
           </form>
         </CardContent>
       </Card>

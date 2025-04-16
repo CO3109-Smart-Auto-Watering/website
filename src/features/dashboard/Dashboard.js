@@ -4,101 +4,60 @@ import { LineChart, Line, BarChart, Bar, PieChart, Pie, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { FaThermometerHalf, FaTint, FaSeedling, FaPrint, FaRegCalendarAlt, 
   FaPowerOff, FaMap, FaSlidersH, FaCloudSun, FaMapMarkedAlt, FaLeaf, 
-  FaChartLine, FaWater, FaTools } from 'react-icons/fa';
-import { Box, useTheme } from '@mui/material';
+  FaChartLine, FaWater, FaTools, FaCog, FaRobot } from 'react-icons/fa';
+import { Box, useTheme, TextField, Slider, FormControl, InputLabel, MenuItem, Select, Typography, Button } from '@mui/material';
 
-// Images
-import caiThiaImage from '../../assets/images/plants/caithia.png';
-import caChuaImage from '../../assets/images/plants/cachua.png';
-import hoaHongImage from '../../assets/images/plants/hoahong.png';
 
 import AdafruitData from './AdafruitData';
 import SensorChart from './SensorChart';
 import PumpControl from './PumpControl';
 import WeatherForecast from './WeatherForecast';
+import { getUserDevices, getDeviceAreaMapping } from '../../services/deviceService';
+import { getAreas } from '../../services/areaService';
+import { sendCommand, getLatestSensorData, getAdafruitFeedData } from '../../services/sensorService';
 
-// Styled Components using theme
-const Logo = styled.h1`
-  font-size: 22px;
-  margin: 0;
-  display: flex;
-  align-items: center;
-  
-  svg {
-    margin-right: 12px;
-  }
-`;
 
+// Thêm các styled components này sau phần import và trước khai báo component Dashboard
+
+// Styled components
 const Header = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 32px;
+  margin-bottom: 24px;
 `;
 
 const HeaderTitle = styled.h1`
-  margin: 0;
   font-size: 28px;
   color: ${props => props.theme.palette.text.primary};
 `;
 
-const PrintButton = styled.button`
-  display: flex;
-  align-items: center;
-  background: ${props => props.theme.palette.primary.main};
-  color: white;
-  border: none;
-  padding: 10px 20px;
-  border-radius: 6px;
-  font-weight: 500;
-  cursor: pointer;
-  font-size: 15px;
-  transition: background 0.2s;
-  
-  &:hover {
-    background: ${props => props.theme.palette.primary.dark};
-  }
-  
-  svg {
-    margin-right: 8px;
-  }
-`;
-
 const Grid = styled.div`
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 24px;
-  margin-bottom: 32px;
+  margin-bottom: 24px;
 `;
 
 const Card = styled.div`
   background: ${props => props.theme.palette.background.paper};
   border-radius: 12px;
-  padding: 24px;
   box-shadow: ${props => props.theme.palette.mode === 'dark' 
     ? '0 4px 12px rgba(0, 0, 0, 0.2)' 
     : '0 4px 12px rgba(0, 0, 0, 0.05)'};
-  transition: background-color 0.3s ease, box-shadow 0.3s ease;
+  overflow: hidden;
 `;
 
 const LargeCard = styled(Card)`
-  grid-column: span 3;
-  @media (max-width: 768px) {
-    grid-column: span 1;
-  }
+  grid-column: 1 / -1;
 `;
 
 const CardHeader = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 16px;
+  padding: 16px;
+  border-bottom: 1px solid ${props => props.theme.palette.divider};
 `;
 
-const CardTitle = styled.h2`
+const CardTitle = styled.h3`
   margin: 0;
-  font-size: 18px;
-  color: ${props => props.theme.palette.text.primary};
+  font-size: 16px;
+  font-weight: 500;
   display: flex;
   align-items: center;
   
@@ -109,313 +68,73 @@ const CardTitle = styled.h2`
 `;
 
 const CardValue = styled.div`
-  font-size: 32px;
-  font-weight: 600;
-  color: ${props => props.theme.palette.text.primary};
-  margin-top: 12px;
+  font-size: 36px;
+  font-weight: 700;
+  text-align: center;
+  padding: 24px;
+  color: ${props => props.theme.palette.primary.main};
 `;
 
-const PumpControlContainer = styled.div`
-  display: flex;
-  gap: 16px;
-  margin-top: 16px;
+// Thêm styled components mới
+const DeviceSelector = styled.div`
+  margin-bottom: 24px;
+  padding: 16px;
+  background: ${props => props.theme.palette.background.paper};
+  border-radius: 12px;
+  box-shadow: ${props => props.theme.palette.mode === 'dark' 
+    ? '0 4px 12px rgba(0, 0, 0, 0.2)' 
+    : '0 4px 12px rgba(0, 0, 0, 0.05)'};
 `;
 
-const PumpModeButton = styled.button`
-  flex: 1;
-  padding: 14px;
-  border: 2px solid ${props => props.$active 
-    ? props.theme.palette.primary.main 
-    : props.theme.palette.divider};
-  background: ${props => props.$active 
-    ? `${props.theme.palette.primary.main}20` 
-    : props.theme.palette.background.paper};
-  border-radius: 8px;
-  cursor: pointer;
-  font-weight: 500;
-  color: ${props => props.$active 
-    ? props.theme.palette.primary.main 
-    : props.theme.palette.text.secondary};
-  transition: all 0.2s;
-  
-  &:hover {
-    border-color: ${props => props.theme.palette.primary.main};
-    color: ${props => props.theme.palette.primary.main};
-  }
-`;
-
-const IconButton = styled.button`
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: ${props => props.theme.palette.text.secondary};
+const SectionTitle = styled.h3`
   font-size: 16px;
-  padding: 4px;
+  font-weight: 600;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  color: ${props => props.theme.palette.text.primary};
   
-  &:hover {
+  svg {
+    margin-right: 8px;
     color: ${props => props.theme.palette.primary.main};
   }
 `;
 
-const AddButton = styled.button`
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
+const DeviceInfo = styled.div`
+  margin-top: 16px;
+  padding: 16px;
   background: ${props => props.theme.palette.mode === 'dark' 
-    ? props.theme.palette.background.default
+    ? props.theme.palette.background.default 
     : '#f5f5f5'};
-  border: 1px dashed ${props => props.theme.palette.divider};
   border-radius: 8px;
-  padding: 12px;
-  margin-top: 16px;
-  cursor: pointer;
-  font-size: 15px;
-  color: ${props => props.theme.palette.text.secondary};
-  transition: all 0.2s;
+  border: 1px solid ${props => props.theme.palette.divider};
+`;
+
+const InfoRow = styled.div`
+  display: flex;
+  margin-bottom: 12px;
+  align-items: center;
   
-  &:hover {
-    background: ${props => props.theme.palette.action.hover};
+  svg {
+    margin-right: 8px;
     color: ${props => props.theme.palette.primary.main};
   }
 `;
 
-// Styled components cho các tính năng mới
-const ZoneGrid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
-  margin-top: 16px;
-`;
-
-const ZoneItem = styled.div`
-  padding: 16px;
-  border-radius: 8px;
-  background: ${props => props.$active 
-    ? `${props.theme.palette.primary.main}20` 
-    : props.theme.palette.mode === 'dark'
-      ? props.theme.palette.background.default
-      : '#f8f9fc'};
-  border: 1px solid ${props => props.$active 
-    ? props.theme.palette.primary.main 
-    : props.theme.palette.divider};
-  cursor: pointer;
-  transition: all 0.2s;
-  
-  &:hover {
-    border-color: ${props => props.theme.palette.primary.main};
-  }
-`;
-
-const ZoneName = styled.div`
-  font-weight: 500;
-  margin-bottom: 4px;
-`;
-
-const ZoneInfo = styled.div`
+const LabelText = styled.span`
   font-size: 14px;
+  font-weight: 500;
   color: ${props => props.theme.palette.text.secondary};
+  margin-right: 8px;
+  min-width: 120px;
 `;
 
-const AddZoneButton = styled(AddButton)`
-  grid-column: span 2;
-`;
-
-const SaveButton = styled.button`
-  background: ${props => props.theme.palette.primary.main};
-  color: white;
-  border: none;
-  border-radius: 6px;
-  padding: 10px 20px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background 0.2s;
-  
-  &:hover {
-    background: ${props => props.theme.palette.primary.dark};
-  }
-`;
-
-const NotificationCenter = styled.div`
-  margin-top: 16px;
-  max-height: 300px;
-  overflow-y: auto;
-`;
-
-const NotificationItem = styled.div`
-  display: flex;
-  align-items: flex-start;
-  padding: 12px;
-  background: ${props => props.$type === 'warning' 
-    ? 'rgba(255, 152, 0, 0.05)' 
-    : 'rgba(33, 150, 243, 0.05)'};
-  background: ${props => props.$type === 'warning' 
-    ? props.theme.palette.mode === 'dark'
-      ? 'rgba(255, 152, 0, 0.15)'
-      : 'rgba(255, 152, 0, 0.05)'
-    : props.theme.palette.mode === 'dark'
-      ? 'rgba(33, 150, 243, 0.15)'
-      : 'rgba(33, 150, 243, 0.05)'};
-  border-left: 4px solid ${props => props.$type === 'warning' ? '#f39c12' : '#2196f3'};
-  border-radius: 4px;
-  margin-bottom: 12px;
-`;
-
-const NotificationIcon = styled.div`
-  margin-right: 12px;
-  font-size: 20px;
-`;
-
-const NotificationContent = styled.div`
-  flex: 1;
-`;
-
-const NotificationTitle = styled.div`
-  font-weight: 500;
-  margin-bottom: 4px;
-  color: ${props => props.theme.palette.text.primary};
-`;
-
-const NotificationMessage = styled.div`
+const ValueText = styled.span`
   font-size: 14px;
-  color: ${props => props.theme.palette.text.secondary};
-  margin-bottom: 4px;
-`;
-
-const NotificationTime = styled.div`
-  font-size: 12px;
-  color: ${props => props.theme.palette.text.disabled};
-`;
-
-const DismissButton = styled.button`
-  background: none;
-  border: none;
-  color: ${props => props.theme.palette.text.disabled};
-  font-size: 18px;
-  cursor: pointer;
-  
-  &:hover {
-    color: ${props => props.theme.palette.text.secondary};
-  }
-`;
-
-const PlantsList = styled.div`
-  margin-top: 16px;
-  max-height: 300px;
-  overflow-y: auto;
-`;
-
-const PlantItem = styled.div`
-  display: flex;
-  align-items: center;
-  padding: 12px;
-  border-bottom: 1px solid ${props => props.theme.palette.divider};
-  
-  &:last-child {
-    border-bottom: none;
-  }
-`;
-
-const PlantImage = styled.img`
-  width: 40px;
-  height: 40px;
-  border-radius: 8px;
-  object-fit: cover;
-  margin-right: 12px;
-`;
-
-const PlantInfo = styled.div`
-  flex: 1;
-`;
-
-const PlantName = styled.div`
-  font-weight: 500;
   color: ${props => props.theme.palette.text.primary};
-`;
-
-const PlantDetails = styled.div`
-  font-size: 13px;
-  color: ${props => props.theme.palette.text.secondary};
-`;
-
-const PlantMenu = styled.div``;
-
-const AddPlantButton = styled(AddButton)``;
-
-const IrrigationModes = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin-top: 16px;
-`;
-
-const ModeItem = styled.div`
-  display: flex;
-  align-items: flex-start;
-  padding: 16px;
-  border-radius: 8px;
-  background: ${props => props.$active 
-    ? `${props.theme.palette.primary.main}20` 
-    : props.theme.palette.mode === 'dark'
-      ? props.theme.palette.background.default
-      : '#f8f9fc'};
-  border: 1px solid ${props => props.$active 
-    ? props.theme.palette.primary.main 
-    : props.theme.palette.divider};
-  cursor: pointer;
-  transition: all 0.2s;
-  
-  &:hover {
-    border-color: ${props => props.theme.palette.primary.main};
-  }
-`;
-
-const ModeIcon = styled.div`
-  font-size: 24px;
-  margin-right: 12px;
-`;
-
-const ModeContent = styled.div`
-  flex: 1;
-`;
-
-const ModeName = styled.div`
   font-weight: 500;
-  margin-bottom: 4px;
-  color: ${props => props.theme.palette.text.primary};
 `;
 
-const ModeDescription = styled.div`
-  font-size: 13px;
-  color: ${props => props.theme.palette.text.secondary};
-`;
-
-
-// Mock data cho các tính năng mới
-const zones = [
-  { id: 1, name: 'Vườn trước', moisture: 62, active: true },
-  { id: 2, name: 'Vườn sau', moisture: 48, active: false },
-  { id: 3, name: 'Khu rau', moisture: 71, active: false },
-  { id: 4, name: 'Khu hoa', moisture: 55, active: false },
-];
-
-const plants = [
-  { id: 1, name: 'Cải thìa', image: caiThiaImage, moistureNeeded: 65 },
-  { id: 2, name: 'Cà chua', image: caChuaImage, moistureNeeded: 60 },
-  { id: 3, name: 'Hoa hồng', image: hoaHongImage, moistureNeeded: 50 },
-];
-
-const devices = [
-  { id: 1, name: 'Cảm biến nhiệt độ', status: 'online', battery: 72 },
-  { id: 2, name: 'Cảm biến ẩm 1', status: 'online', battery: 85 },
-  { id: 3, name: 'Cảm biến ẩm 2', status: 'maintenance', battery: 45 },
-  { id: 4, name: 'Van nước 1', status: 'offline', battery: 12 },
-];
-
-const pumpStats = [
-  { name: 'Tự động', value: 75 },
-  { name: 'Thủ công', value: 25 },
-];
 
 const Dashboard = () => {
   const muiTheme = useTheme();
@@ -432,50 +151,304 @@ const Dashboard = () => {
   const [irrigationMode, setIrrigationMode] = useState('balanced');
   const [maintenanceNeeded, setMaintenanceNeeded] = useState(true);
   const [isListening, setIsListening] = useState(false);
+  
+  // State mới cho chức năng chọn thiết bị và thiết lập ngưỡng độ ẩm
+  const [devices, setDevices] = useState([]);
+  const [areas, setAreas] = useState([]);
+  const [selectedDevice, setSelectedDevice] = useState('');
+  const [deviceAreaMap, setDeviceAreaMap] = useState({});
+  const [moistureThreshold, setMoistureThreshold] = useState(60);
+  const [moistureMaxThreshold, setMoistureMaxThreshold] = useState(80);
+  const [isAutoMode, setIsAutoMode] = useState(false);
+  const [currentSoilMoisture, setCurrentSoilMoisture] = useState(0);
+  const [isThresholdActive, setIsThresholdActive] = useState(false);
 
-  // Hàm cho các tính năng hiện có
-  const togglePump = () => {
-    if (pumpMode === 'manual') {
-      setIsPumpActive(!isPumpActive);
+  const [sensorValues, setSensorValues] = useState({
+    temp: '--',
+    humidity: '--',
+    soil: '--'
+  });
+  
+  useEffect(() => {
+    const updateSensorValues = async () => {
+      try {
+        const [temp, humidity, soil] = await Promise.all([
+          getAdafruitFeedData('sensor-temp'),
+          getAdafruitFeedData('sensor-humidity'),
+          getAdafruitFeedData('sensor-soil')
+        ]);
+        
+        setSensorValues({
+          temp: temp !== null ? temp : '--',
+          humidity: humidity !== null ? humidity : '--',
+          soil: soil !== null ? soil : '--'
+        });
+      } catch (error) {
+        console.error('Error fetching sensor values:', error);
+      }
+    };
+    
+    updateSensorValues();
+    const intervalId = setInterval(updateSensorValues, 10000);
+    return () => clearInterval(intervalId);
+  }, []);
+
+  // Load devices, areas, and device-area mappings
+  useEffect(() => {
+    const fetchDevicesAndAreas = async () => {
+      try {
+        // Fetch devices
+        const devicesResponse = await getUserDevices();
+        if (devicesResponse.success) {
+          setDevices(devicesResponse.devices);
+          // Tự động chọn thiết bị đầu tiên nếu có
+          if (devicesResponse.devices.length > 0) {
+            setSelectedDevice(devicesResponse.devices[0].deviceId);
+          }
+        }
+        
+        // Fetch areas
+        const areasResponse = await getAreas();
+        if (areasResponse.success) {
+          setAreas(areasResponse.areas);
+        }
+        
+        // Fetch device-area mappings
+        const mappingsResponse = await getDeviceAreaMapping();
+        if (mappingsResponse.success) {
+          // Tạo map từ deviceId -> { areaId, plantIndex }
+          const mapping = {};
+          mappingsResponse.mappings.forEach(item => {
+            mapping[item.deviceId] = {
+              areaId: item.areaId,
+              plantIndex: item.plantIndex !== undefined ? item.plantIndex : -1
+            };
+          });
+          setDeviceAreaMap(mapping);
+        }
+      } catch (error) {
+        console.error('Error fetching devices and areas:', error);
+      }
+    };
+    
+    fetchDevicesAndAreas();
+  }, []);
+  
+  // Cập nhật giá trị độ ẩm đất hiện tại từ sensor
+  useEffect(() => {
+    const updateCurrentMoisture = async () => {
+      try {
+        // Sử dụng service với deviceId
+        const soilMoistureValue = await getAdafruitFeedData('sensor-soil', selectedDevice);
+        if (soilMoistureValue !== null) {
+          setCurrentSoilMoisture(parseInt(soilMoistureValue, 10));
+        }
+      } catch (error) {
+        console.error(`Error updating current moisture for device ${selectedDevice}:`, error);
+      }
+    };
+    
+    if (selectedDevice) {
+      updateCurrentMoisture();
+      const intervalId = setInterval(updateCurrentMoisture, 10000);
+      return () => clearInterval(intervalId);
+    }
+  }, [selectedDevice]);
+  
+  // Logic để tự động điều khiển máy bơm dựa trên ngưỡng độ ẩm
+  useEffect(() => {
+    const autoControlPump = async () => {
+      if (isAutoMode && isThresholdActive) {
+        try {
+          if (currentSoilMoisture < moistureThreshold) {
+            // Độ ẩm dưới ngưỡng -> bật bơm
+            await sendCommand('pump-motor', 1);
+            setIsPumpActive(true);
+          } else {
+            // Độ ẩm đạt ngưỡng -> tắt bơm
+            await sendCommand('pump-motor', 0);
+            setIsPumpActive(false);
+          }
+        } catch (error) {
+          console.error('Error auto controlling pump:', error);
+        }
+      }
+    };
+    
+    autoControlPump();
+  }, [isAutoMode, isThresholdActive, currentSoilMoisture, moistureThreshold]);
+
+  useEffect(() => {
+    if (selectedDevice) {
+      console.log(`Đang tải dữ liệu cho thiết bị: ${selectedDevice}`);
+      
+      // Cập nhật dữ liệu cảm biến cho thiết bị đã chọn
+      const updateDeviceSensors = async () => {
+        try {
+          const [temp, humidity, soil] = await Promise.all([
+            getAdafruitFeedData('sensor-temp', selectedDevice),
+            getAdafruitFeedData('sensor-humidity', selectedDevice),
+            getAdafruitFeedData('sensor-soil', selectedDevice)
+          ]);
+          
+          setSensorValues({
+            temp: temp !== null ? temp : '--',
+            humidity: humidity !== null ? humidity : '--',
+            soil: soil !== null ? soil : '--'
+          });
+          
+          // Cập nhật độ ẩm đất hiện tại
+          if (soil !== null) {
+            setCurrentSoilMoisture(parseInt(soil, 10));
+          }
+        } catch (error) {
+          console.error(`Lỗi khi cập nhật dữ liệu cảm biến cho thiết bị ${selectedDevice}:`, error);
+        }
+      };
+      
+      updateDeviceSensors();
+    }
+  }, [selectedDevice]);
+
+  // Hàm xử lý thay đổi thiết bị
+  const handleDeviceChange = (event) => {
+    setSelectedDevice(event.target.value);
+  };
+  
+  // Hàm áp dụng ngưỡng độ ẩm
+  const applyMoistureThreshold = async () => {
+    try {
+      // Chuyển sang chế độ tự động với deviceId
+      await sendCommand('mode', 0, selectedDevice);
+      setIsAutoMode(true);
+      setIsThresholdActive(true);
+      
+      // Kiểm tra độ ẩm hiện tại và điều khiển bơm
+      if (currentSoilMoisture < moistureThreshold) {
+        await sendCommand('pump-motor', 1, selectedDevice);
+        setIsPumpActive(true);
+      } else {
+        await sendCommand('pump-motor', 0, selectedDevice);
+        setIsPumpActive(false);
+      }
+    } catch (error) {
+      console.error(`Error applying moisture threshold for device ${selectedDevice}:`, error);
     }
   };
-
-  // Hàm cho các tính năng mới
-  const selectZone = (zoneId) => {
-    setSelectedZone(zoneId);
+  
+  // Hàm tắt ngưỡng độ ẩm
+  const disableMoistureThreshold = async () => {
+    try {
+      setIsThresholdActive(false);
+      // Tắt máy bơm khi tắt chế độ tự động
+      await sendCommand('pump-motor', 0, selectedDevice);
+      setIsPumpActive(false);
+    } catch (error) {
+      console.error(`Error disabling moisture threshold for device ${selectedDevice}:`, error);
+    }
   };
-
-  const updateThreshold = (type, value) => {
-    setThresholds({
-      ...thresholds,
-      [type]: value
-    });
+  
+  // Lấy thông tin khu vực và cây trồng của thiết bị được chọn
+  const getDeviceAreaAndPlant = () => {
+    if (!selectedDevice || !deviceAreaMap[selectedDevice]) {
+      return { areaName: '', plantName: '', moistureNeeded: 0 };
+    }
+    
+    const mapping = deviceAreaMap[selectedDevice];
+    const area = areas.find(a => a._id === mapping.areaId);
+    
+    if (!area) {
+      return { areaName: '', plantName: '', moistureNeeded: 0 };
+    }
+    
+    let plantName = '';
+    let moistureNeeded = 0;
+    let moistureMaxThreshold = 0;
+    
+    if (mapping.plantIndex >= 0 && area.plants && area.plants[mapping.plantIndex]) {
+      plantName = area.plants[mapping.plantIndex].name;
+      moistureNeeded = area.plants[mapping.plantIndex].moistureThreshold.min || 60;
+      moistureMaxThreshold = area.plants[mapping.plantIndex].moistureThreshold.max || 80; 
+    }
+    
+    return {
+      areaName: area.name,
+      plantName,
+      moistureNeeded,
+      moistureMaxThreshold
+    };
   };
+  
+  // Thông tin thiết bị, khu vực và cây trồng
+  const deviceInfo = getDeviceAreaAndPlant();
+  const selectedDeviceInfo = devices.find(d => d.deviceId === selectedDevice);
 
-  const dismissNotification = (id) => {
-    // Xử lý xóa thông báo
-  };
-
-  const selectGardenArea = (areaId) => {
-    setSelectedArea(areaId);
-  };
-
-  const getMoistureColor = (moisture) => {
-    if (moisture < 50) return '#e74c3c';
-    if (moisture < 65) return '#f39c12';
-    return '#27ae60';
-  };
-
-  const toggleVoiceControl = () => {
-    setIsListening(!isListening);
-  };
-
-  // Truyền theme từ MUI vào styled-components
   return (
     <Box>
       <Header theme={muiTheme}>
         <HeaderTitle theme={muiTheme}>Bảng Điều Khiển</HeaderTitle>
       </Header>
+      
+      {/* Phần chọn thiết bị và hiển thị thông tin */}
+      <DeviceSelector theme={muiTheme}>
+        <SectionTitle theme={muiTheme}>
+          <FaTools /> Chọn thiết bị giám sát
+        </SectionTitle>
+        
+        <FormControl fullWidth variant="outlined" size="small">
+          <InputLabel>Thiết bị</InputLabel>
+          <Select
+            value={selectedDevice}
+            onChange={handleDeviceChange}
+            label="Thiết bị"
+          >
+            {devices.map(device => (
+              <MenuItem key={device.deviceId} value={device.deviceId}>
+                {device.deviceName}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+        
+        {selectedDevice && (
+          <DeviceInfo theme={muiTheme}>
+            <InfoRow theme={muiTheme}>
+              <LabelText theme={muiTheme}>Trạng thái:</LabelText>
+              <ValueText theme={muiTheme}>
+                {selectedDeviceInfo?.isActive ? 'Đang hoạt động' : 'Không hoạt động'}
+              </ValueText>
+            </InfoRow>
+            
+            {deviceInfo.areaName && (
+              <>
+                <InfoRow theme={muiTheme}>
+                  <FaMap />
+                  <LabelText theme={muiTheme}>Khu vực:</LabelText>
+                  <ValueText theme={muiTheme}>{deviceInfo.areaName}</ValueText>
+                </InfoRow>
+              </>
+            )}
+            
+            {deviceInfo.plantName && (
+              <InfoRow theme={muiTheme}>
+                <FaLeaf />
+                <LabelText theme={muiTheme}>Cây trồng:</LabelText>
+                <ValueText theme={muiTheme}>{deviceInfo.plantName}</ValueText>
+              </InfoRow>
+            )}
+            
+            {deviceInfo.moistureNeeded > 0 && (
+              <InfoRow theme={muiTheme}>
+                <FaWater />
+                <LabelText theme={muiTheme}>Độ ẩm khuyến nghị:</LabelText>
+                <ValueText theme={muiTheme}>
+                  {deviceInfo.moistureNeeded}% - {deviceInfo.moistureMaxThreshold}%
+                </ValueText>
+              </InfoRow>
+            )}
+          </DeviceInfo>
+        )}
+      </DeviceSelector>
       
       {/* Quick Stats */}
       <Grid>
@@ -484,7 +457,7 @@ const Dashboard = () => {
             <CardTitle theme={muiTheme}><FaThermometerHalf /> Nhiệt độ</CardTitle>
           </CardHeader>
           <CardValue theme={muiTheme}>
-            <AdafruitData feedName="sensor-temp" />°C
+            {sensorValues.temp}°C
           </CardValue>
         </Card>
         
@@ -493,7 +466,7 @@ const Dashboard = () => {
             <CardTitle theme={muiTheme}><FaTint /> Độ ẩm không khí</CardTitle>
           </CardHeader>            
           <CardValue theme={muiTheme}>
-            <AdafruitData feedName="sensor-humidity" />%
+            {sensorValues.humidity}%
           </CardValue>
         </Card>
         
@@ -502,7 +475,7 @@ const Dashboard = () => {
             <CardTitle theme={muiTheme}><FaSeedling /> Độ ẩm đất</CardTitle>
           </CardHeader>
           <CardValue theme={muiTheme}>
-            <AdafruitData feedName="sensor-soil" />%
+            {sensorValues.soil}%
           </CardValue>
         </Card>
       </Grid>
@@ -524,55 +497,18 @@ const Dashboard = () => {
               <FaPowerOff /> Điều khiển bơm
             </CardTitle>
           </CardHeader>
-          <PumpControl />
+          <PumpControl 
+            isAutoThresholdActive={isThresholdActive}
+            onEnableAutoThreshold={applyMoistureThreshold}
+            onDisableAutoThreshold={disableMoistureThreshold}
+            deviceInfo={deviceInfo}
+            currentSoilMoisture={currentSoilMoisture}
+            areas={areas}
+            deviceAreaMap={deviceAreaMap}
+            selectedDevice={selectedDevice}
+          />
         </Card>
         
-        {/* Pump Stats */}
-        <Card theme={muiTheme}>
-          <CardHeader theme={muiTheme}>
-            <CardTitle theme={muiTheme}>Thời gian hoạt động</CardTitle>
-          </CardHeader>
-          <ResponsiveContainer width="100%" height={200}>
-            <PieChart>
-              <Pie
-                data={pumpStats}
-                cx="50%"
-                cy="50%"
-                innerRadius={60}
-                outerRadius={80}
-                fill={muiTheme.palette.primary.main}
-                dataKey="value"
-                nameKey="name"
-                label
-              >
-              </Pie>
-              <Tooltip />
-              <Legend />
-            </PieChart>
-          </ResponsiveContainer>
-        </Card>
-      
-        {/* Zone Management - Tính năng quản lý khu vực */}
-        <Card theme={muiTheme}>
-          <CardHeader theme={muiTheme}>
-            <CardTitle theme={muiTheme}><FaMap /> Quản lý khu vực</CardTitle>
-          </CardHeader>
-          <ZoneGrid>
-            {zones.map(zone => (
-              <ZoneItem 
-                key={zone.id} 
-                $active={selectedZone === zone.id} 
-                onClick={() => selectZone(zone.id)}
-                theme={muiTheme}
-              >
-                <ZoneName theme={muiTheme}>{zone.name}</ZoneName>
-                <ZoneInfo theme={muiTheme}>Độ ẩm: {zone.moisture}%</ZoneInfo>
-              </ZoneItem>
-            ))}
-            <AddZoneButton theme={muiTheme}>+ Thêm khu vực</AddZoneButton>
-          </ZoneGrid>
-        </Card>
-
         {/* Weather Forecast - Dự báo thời tiết */}
         <Card theme={muiTheme}>
           <CardHeader theme={muiTheme}>
@@ -581,69 +517,7 @@ const Dashboard = () => {
           <WeatherForecast />
         </Card>
         
-        {/* Plant Management - Quản lý cây trồng */}
-        <Card theme={muiTheme}>
-          <CardHeader theme={muiTheme}>
-            <CardTitle theme={muiTheme}><FaLeaf /> Cây trồng</CardTitle>
-          </CardHeader>
-          <PlantsList theme={muiTheme}>
-            {plants.map(plant => (
-              <PlantItem key={plant.id} theme={muiTheme}>
-                <PlantImage src={plant.image} alt={plant.name} />
-                <PlantInfo>
-                  <PlantName theme={muiTheme}>{plant.name}</PlantName>
-                  <PlantDetails theme={muiTheme}>Độ ẩm yêu cầu: {plant.moistureNeeded}%</PlantDetails>
-                </PlantInfo>
-                <PlantMenu>
-                  <IconButton theme={muiTheme}>⋮</IconButton>
-                </PlantMenu>
-              </PlantItem>
-            ))}
-          </PlantsList>
-          <AddPlantButton theme={muiTheme}>+ Thêm cây trồng</AddPlantButton>
-        </Card>
-
-        {/* Advanced Irrigation Modes - Chế độ tưới nâng cao */}
-        <Card theme={muiTheme}>
-          <CardHeader theme={muiTheme}>
-            <CardTitle theme={muiTheme}><FaWater /> Chế độ tưới thông minh</CardTitle>
-          </CardHeader>
-          <IrrigationModes>
-            <ModeItem 
-              $active={irrigationMode === 'eco'} 
-              onClick={() => setIrrigationMode('eco')}
-              theme={muiTheme}
-            >
-              <ModeIcon>🌱</ModeIcon>
-              <ModeContent>
-                <ModeName theme={muiTheme}>Tiết kiệm</ModeName>
-                <ModeDescription theme={muiTheme}>Tối ưu hóa lượng nước, tưới ít và thường xuyên</ModeDescription>
-              </ModeContent>
-            </ModeItem>
-            <ModeItem 
-              $active={irrigationMode === 'balanced'} 
-              onClick={() => setIrrigationMode('balanced')}
-              theme={muiTheme}
-            >
-              <ModeIcon>⚖️</ModeIcon>
-              <ModeContent>
-                <ModeName theme={muiTheme}>Cân bằng</ModeName>
-                <ModeDescription theme={muiTheme}>Cân đối giữa tiết kiệm và hiệu quả tưới</ModeDescription>
-              </ModeContent>
-            </ModeItem>
-            <ModeItem 
-              $active={irrigationMode === 'intensive'} 
-              onClick={() => setIrrigationMode('intensive')}
-              theme={muiTheme}
-            >
-              <ModeIcon>💦</ModeIcon>
-              <ModeContent>
-                <ModeName theme={muiTheme}>Tăng cường</ModeName>
-                <ModeDescription theme={muiTheme}>Tưới nhiều hơn cho cây mới trồng hoặc thời tiết nóng</ModeDescription>
-              </ModeContent>
-            </ModeItem>
-          </IrrigationModes>
-        </Card>
+        {/* Các phần hiển thị khác có thể giữ nguyên */}
       </Grid>
     </Box>
   );

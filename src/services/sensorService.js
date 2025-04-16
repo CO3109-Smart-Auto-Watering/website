@@ -25,33 +25,41 @@ api.interceptors.request.use(
 );
 
 // Get latesgetLatestSensorData sensor data
-export const getLatestSensorData = async () => {
+export const getLatestSensorData = async (deviceId = null) => {
   const token = localStorage.getItem('token');
   try {
-    const response = await axios.get(`${API_URL}/sensor-data/latest`, {
+    const endpoint = deviceId 
+      ? `${API_URL}/sensor-data/${deviceId}/latest` 
+      : `${API_URL}/sensor-data/latest`;
+    
+    const response = await axios.get(endpoint, {
       headers: {
         'x-auth-token': token
       }
     });
     return response.data;
   } catch (error) {
-    console.error('Error fetching latest sensor data:', error);
+    console.error(`Error fetching latest sensor data${deviceId ? ' for device '+deviceId : ''}:`, error);
     throw error;
   }
 };
 
 // Get historical data for a specific feed
-export const getHistoricalData = async (feedName, limit = 24) => {
+export const getHistoricalData = async (feedName, limit = 24, deviceId = null) => {
   const token = localStorage.getItem('token');
   try {
-    const response = await axios.get(`${API_URL}/sensor-data/history/${feedName}?limit=${limit}`, {
+    const endpoint = deviceId
+      ? `${API_URL}/sensor-data/${deviceId}/history/${feedName}?limit=${limit}`
+      : `${API_URL}/sensor-data/history/${feedName}?limit=${limit}`;
+    
+    const response = await axios.get(endpoint, {
       headers: {
         'x-auth-token': token
       }
     });
     return response.data;
   } catch (error) {
-    console.error(`Error fetching historical data for ${feedName}:`, error);
+    console.error(`Error fetching historical data for ${feedName}${deviceId ? ' of device '+deviceId : ''}:`, error);
     throw error;
   } 
 };
@@ -94,10 +102,41 @@ export const setSchedule = async (scheduleData) => {
   }
 };
 
+export const getAdafruitFeedData = async (feedName, deviceId = null) => {
+  try {
+    const token = localStorage.getItem('token');
+    
+    const endpoint = deviceId
+      ? `${API_URL}/sensor-data/${deviceId}/feed/${feedName}`
+      : `${API_URL}/sensor-data/feed/${feedName}`;
+    
+    const response = await axios.get(endpoint, {
+      headers: {
+        'x-auth-token': token
+      }
+    });
+    
+    // Axios tự động chuyển response thành JSON
+    const data = response.data;
+    
+    if (data.success && data.value !== undefined) {
+      return data.value;
+    } else {
+      console.error(`Error fetching Adafruit data for ${feedName}${deviceId ? ' of device '+deviceId : ''}:`, data.message || 'Unknown error');
+      return null;
+    }
+  } catch (error) {
+    console.error(`Error fetching Adafruit data for ${feedName}${deviceId ? ' of device '+deviceId : ''}:`, error);
+    return null;
+  }
+};
+
+
 const sensorService = {
   getLatestSensorData,
   sendCommand,
-  setSchedule
+  setSchedule,
+  getAdafruitFeedData,
 };
 
 export default sensorService;
