@@ -278,15 +278,15 @@ const wateringData = [
   { date: '07/04', autoCount: 5, manualCount: 1 },
 ];
 
-const moistureData = [
-  { date: '01/04', morning: 65, afternoon: 55, evening: 60 },
-  { date: '02/04', morning: 68, afternoon: 52, evening: 63 },
-  { date: '03/04', morning: 62, afternoon: 50, evening: 58 },
-  { date: '04/04', morning: 70, afternoon: 58, evening: 65 },
-  { date: '05/04', morning: 67, afternoon: 54, evening: 62 },
-  { date: '06/04', morning: 65, afternoon: 52, evening: 60 },
-  { date: '07/04', morning: 69, afternoon: 56, evening: 64 },
-];
+// const moistureData = [
+//   { date: '01/04', morning: 65, afternoon: 55, evening: 60 },
+//   { date: '02/04', morning: 68, afternoon: 52, evening: 63 },
+//   { date: '03/04', morning: 62, afternoon: 50, evening: 58 },
+//   { date: '04/04', morning: 70, afternoon: 58, evening: 65 },
+//   { date: '05/04', morning: 67, afternoon: 54, evening: 62 },
+//   { date: '06/04', morning: 65, afternoon: 52, evening: 60 },
+//   { date: '07/04', morning: 69, afternoon: 56, evening: 64 },
+// ];
 
 const waterConsumptionData = [
   { month: 'Jan', amount: 120 },
@@ -362,19 +362,11 @@ const ReportsAnalytics = () => {
         console.log("Dữ liệu thiết bị nhận về:", response.devices);
         setDevices(response.devices);
       } else {
-        // setSnackbar({
-        //   open: true,
-        //   message: 'Không thể tải danh sách thiết bị',
-        //   severity: 'error'
-        // });
+
       }
     } catch (error) {
       console.error('Error fetching devices:', error);
-      // setSnackbar({
-      //   open: true,
-      //   message: error.response?.data?.message || 'Lỗi khi tải thiết bị',
-      //   severity: 'error'
-      // });
+
     } finally {
       setIsLoading(false);
     }
@@ -388,6 +380,12 @@ const ReportsAnalytics = () => {
   const [loading, setLoading] = useState(false);
   const token = localStorage.getItem('token');
   const [moistureData, setMoistureData] = useState([]);
+  const [avgDataTemp, setAvgDataTemp] = useState([]);
+  const [loadingTemp, setLoadingTemp] = useState(false);
+  const [moistureDataTemp, setMoistureDataTemp] = useState([]);
+  const [avgDataHumidity, setAvgDataHumidity] = useState([]);
+  const [loadingHumidity, setLoadingHumidity] = useState(false);
+  const [moistureDataHumidity, setMoistureDataHumidity] = useState([]);
   const [modeData, setModeData] = useState([]);
   const [modeState, setModeState] = useState({ modeLoading: true, results: [] });
   const [dailyData, setDailyData] = useState([]);
@@ -489,11 +487,152 @@ const ReportsAnalytics = () => {
     ? displayData[0].average
     : null;
 
+  // Fetch average data from API
+  useEffect(() => {
+    const fetchAverageDataTemp = async () => {
+      try {
+        setLoadingTemp(true);
+        const res = await axios.get(`${baseURL}/average`, {
+          headers: { 'x-auth-token': token },
+          params: { feedName: 'sensor-temp' }
+        });
+        setAvgDataTemp(res.data.results);
+      } catch (err) {
+        console.error('Lỗi khi lấy dữ liệu:', err);
+      } finally {
+        setLoadingTemp(false);
+      }
+    };
+    fetchAverageDataTemp();
+  }, [zoneFilter, dateRange, token]);
+
+  // Filter data based on selected zone
+  const filteredTemp = zoneFilter === 'all'
+    ? avgDataTemp
+    : avgDataTemp.filter(device => device.deviceId === zoneFilter);
+
+  // Map data to display the average values
+  const displayDataTemp = filteredTemp.map(device => {
+    const average = dateRange === '7days'
+      ? device.averages.last7DaysAvg
+      : device.averages.last30DaysAvg;
+    return {
+      deviceId: device.deviceId,
+      average,
+      daily: device.daily // contains { date, average }
+    };
+  });
+
+  // Update moistureData when filters change
+  useEffect(() => {
+    let dataTemp = [];
+    if (zoneFilter === 'all') {
+      dataTemp = mergeDailyAverages(displayDataTemp);
+    } else {
+      // specific device: filter its daily entries by dateRange
+      const device = displayDataTemp.find(d => d.deviceId === zoneFilter);
+      if (device) {
+        dataTemp = device.daily.filter(entry => {
+          const entryDate = new Date(entry.date);
+          const now = new Date();
+          const diff = now - entryDate;
+          const limit = dateRange === '7days'
+            ? 7 * 24 * 60 * 60 * 1000
+            : 30 * 24 * 60 * 60 * 1000;
+          return diff <= limit;
+        });
+      }
+    }
+    setMoistureDataTemp(dataTemp);
+    console.log("Temp data:", dataTemp);
+  }, [zoneFilter, dateRange, avgDataTemp]);
+
+  // Calculate total average for 'all'
+  const totalAvgTemp = zoneFilter === 'all' && displayDataTemp.length > 0
+    ? Number((displayDataTemp.reduce((sum, d) => sum + d.average, 0) / displayDataTemp.length).toFixed(1))
+    : null;
+
+  // Specific device average
+  const specificAvgTemp = zoneFilter !== 'all' && displayDataTemp.length > 0
+    ? displayDataTemp[0].average
+    : null;
+
+  // Fetch average data from API
+  useEffect(() => {
+    const fetchAverageDataHumidity = async () => {
+      try {
+        setLoadingHumidity(true);
+        const res = await axios.get(`${baseURL}/average`, {
+          headers: { 'x-auth-token': token },
+          params: { feedName: 'sensor-humidity' }
+        });
+        setAvgDataHumidity(res.data.results);
+      } catch (err) {
+        console.error('Lỗi khi lấy dữ liệu:', err);
+      } finally {
+        setLoadingHumidity(false);
+      }
+    };
+    fetchAverageDataHumidity();
+  }, [zoneFilter, dateRange, token]);
+
+  // Filter data based on selected zone
+  const filteredHumidity = zoneFilter === 'all'
+    ? avgDataHumidity
+    : avgDataHumidity.filter(device => device.deviceId === zoneFilter);
+
+  // Map data to display the average values
+  const displayDataHumidity = filteredHumidity.map(device => {
+    const average = dateRange === '7days'
+      ? device.averages.last7DaysAvg
+      : device.averages.last30DaysAvg;
+    return {
+      deviceId: device.deviceId,
+      average,
+      daily: device.daily // contains { date, average }
+    };
+  });
+
+  // Update moistureData when filters change
+  useEffect(() => {
+    let dataHumidity = [];
+    if (zoneFilter === 'all') {
+      dataHumidity = mergeDailyAverages(displayDataHumidity);
+    } else {
+      // specific device: filter its daily entries by dateRange
+      const device = displayDataHumidity.find(d => d.deviceId === zoneFilter);
+      if (device) {
+        dataHumidity = device.daily.filter(entry => {
+          const entryDate = new Date(entry.date);
+          const now = new Date();
+          const diff = now - entryDate;
+          const limit = dateRange === '7days'
+            ? 7 * 24 * 60 * 60 * 1000
+            : 30 * 24 * 60 * 60 * 1000;
+          return diff <= limit;
+        });
+      }
+    }
+    setMoistureDataHumidity(dataHumidity);
+    console.log("Humidity data:", dataHumidity);
+  }, [zoneFilter, dateRange, avgDataHumidity]);
+
+  // Calculate total average for 'all'
+  const totalAvgHumidity = zoneFilter === 'all' && displayDataHumidity.length > 0
+    ? Number((displayDataHumidity.reduce((sum, d) => sum + d.average, 0) / displayDataHumidity.length).toFixed(1))
+    : null;
+
+  // Specific device average
+  const specificAvgHumidity = zoneFilter !== 'all' && displayDataHumidity.length > 0
+    ? displayDataHumidity[0].average
+    : null;
+
+
   useEffect(() => {
     const fetchModeData = async () => {
       try {
         // setLoading(true);
-        const endpoint = zoneFilter === 'all' ? '/mode/summary/cleaned' : '/mode/summary';
+        const endpoint = zoneFilter === 'all' ? '/pump-motor/summary/cleaned' : '/pump-motor/summary';
         const res = await axios.get(`${baseURL}${endpoint}`, {
           headers: { "x-auth-token": token },
           params: zoneFilter === 'all' ? {} : { deviceId: zoneFilter },
@@ -501,9 +640,10 @@ const ReportsAnalytics = () => {
         setModeData({
           autoMode: res.data.autoMode || 0,
           manualMode: res.data.manualMode || 0,
+          total: res.data.total || 0,
         });
       } catch (err) {
-        console.error("Fetch mode summary error:", err);
+        console.error("Fetch pump-motor summary error:", err);
         setModeData({ autoMode: 0, manualMode: 0 });
       } finally {
         setLoading(false);
@@ -512,6 +652,27 @@ const ReportsAnalytics = () => {
 
     fetchModeData();
   }, [zoneFilter]);
+
+  const mergeDataByDate = (moistureData, humidityData, tempData) => {
+    const mergedMap = new Map();
+
+    const merge = (data, key) => {
+      data.forEach(({ date, average }) => {
+        if (!mergedMap.has(date)) {
+          mergedMap.set(date, { date });
+        }
+        mergedMap.get(date)[key] = average;
+      });
+    };
+
+    merge(moistureData, 'moisture');
+    merge(humidityData, 'humidity');
+    merge(tempData, 'temp');
+
+    return Array.from(mergedMap.values()).sort((a, b) => new Date(a.date) - new Date(b.date));
+  };
+
+  const chartData = mergeDataByDate(moistureData, moistureDataHumidity, moistureDataTemp);
 
   return (
     <ReportContainer>
@@ -617,8 +778,42 @@ const ReportsAnalytics = () => {
                 )}
               </SummaryValue>
             </SummaryCard>
-
             <SummaryCard theme={theme}>
+              <SummaryTitle theme={theme}>Nhiệt độ trung bình</SummaryTitle>
+              <SummaryValue theme={theme}>
+                <TbPlant />
+                {loading ? (
+                  <div>...</div>
+                ) : zoneFilter === "all" ? (
+                  <div>{totalAvgTemp}%</div>
+                ) : (
+                  displayDataTemp.map(device => (
+                    <div key={device.deviceId}>
+                      {device.average}%
+                    </div>
+                  ))
+                )}
+              </SummaryValue>
+            </SummaryCard>
+            <SummaryCard theme={theme}>
+              <SummaryTitle theme={theme}>Độ ẩm không khí trung bình</SummaryTitle>
+              <SummaryValue theme={theme}>
+                <TbPlant />
+                {loading ? (
+                  <div>...</div>
+                ) : zoneFilter === "all" ? (
+                  <div>{totalAvgHumidity}%</div>
+                ) : (
+                  displayDataHumidity.map(device => (
+                    <div key={device.deviceId}>
+                      {device.average}%
+                    </div>
+                  ))
+                )}
+              </SummaryValue>
+            </SummaryCard>
+
+            {/* <SummaryCard theme={theme}>
               <SummaryTitle theme={theme}>Số lần tưới tự động</SummaryTitle>
               <SummaryValue theme={theme}>
                 <FaSyncAlt /> {loading ? "..." : `${modeData.autoMode} lần`}
@@ -630,18 +825,28 @@ const ReportsAnalytics = () => {
               <SummaryValue theme={theme}>
                 <FaInfoCircle /> {loading ? "..." : `${modeData.manualMode} lần`}
               </SummaryValue>
-            </SummaryCard>
+            </SummaryCard> */}
+            {
+              zoneFilter == "all" ? (<div></div>) : (
+                <SummaryCard theme={theme}>
+                  <SummaryTitle theme={theme}>Số lần máy bơm hoạt động</SummaryTitle>
+                  <SummaryValue theme={theme}>
+                    <FaSyncAlt /> {loading ? "..." : `${modeData.total} lần`}
+                  </SummaryValue>
+                </SummaryCard>
+              )
+            }
           </SummaryGrid>
 
           <Grid>
             <LargeCard theme={theme} ref={chartRef}>
               <CardHeader theme={theme}>
                 <CardTitle theme={theme}>
-                  <FaChartLine /> Diễn biến độ ẩm đất
+                  <FaChartLine /> Biểu đô cảm biến
                 </CardTitle>
               </CardHeader>
               <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={moistureData}>
+                <LineChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />
                   <XAxis dataKey="date" stroke={theme.palette.text.secondary} />
                   <YAxis stroke={theme.palette.text.secondary} />
@@ -652,13 +857,9 @@ const ReportsAnalytics = () => {
                       color: theme.palette.text.primary
                     }}
                   />
-                  <Line
-                    type="monotone"
-                    dataKey="average"
-                    name="Độ ẩm trung bình đất"
-                    stroke="#8884d8"
-                    activeDot={{ r: 8 }}
-                  />
+                  <Line type="monotone" dataKey="moisture" name="Độ ẩm đất" stroke="#8884d8" activeDot={{ r: 8 }} />
+                  <Line type="monotone" dataKey="humidity" name="Độ ẩm không khí" stroke="#82ca9d" activeDot={{ r: 8 }} />
+                  <Line type="monotone" dataKey="temp" name="Nhiệt độ" stroke="#ffc658" activeDot={{ r: 8 }} />
                 </LineChart>
               </ResponsiveContainer>
             </LargeCard>
