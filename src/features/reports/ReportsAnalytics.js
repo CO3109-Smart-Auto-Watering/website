@@ -19,6 +19,11 @@ const baseURL = process.env.REACT_APP_API_URL
 // Styled components với hỗ trợ theme sáng/tối
 const ReportContainer = styled.div`
   padding: 20px 0;
+
+  @media print {
+    width: 100%;
+    padding: 10mm; // Khoảng cách lề khi in
+  }
 `;
 
 const Header = styled.div`
@@ -112,6 +117,14 @@ const Card = styled.div`
     ? '0 4px 12px rgba(0, 0, 0, 0.2)'
     : '0 4px 12px rgba(0, 0, 0, 0.05)'};
   transition: background-color 0.3s ease, box-shadow 0.3s ease;
+  display: flex; // Thêm flex để căn giữa
+  flex-direction: column;
+  align-items: center; // Căn giữa nội dung theo chiều ngang
+
+  @media print {
+    page-break-inside: avoid; // Tránh ngắt trang giữa các card
+    width: 100%;
+  }
 `;
 
 const LargeCard = styled(Card)`
@@ -126,6 +139,7 @@ const CardHeader = styled.div`
   justify-content: space-between;
   align-items: center;
   margin-bottom: 16px;
+  width: 100%; // Đảm bảo tiêu đề chiếm toàn bộ chiều rộng
 `;
 
 const CardTitle = styled.h2`
@@ -145,6 +159,10 @@ const SummaryGrid = styled.div`
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 16px;
+
+  @media print {
+    grid-template-columns: repeat(2, 1fr); // Giữ bố cục 2 cột khi in
+  }
 `;
 
 const SummaryCard = styled.div`
@@ -156,6 +174,10 @@ const SummaryCard = styled.div`
   display: flex;
   flex-direction: column;
   transition: background-color 0.3s ease;
+
+  @media print {
+    page-break-inside: avoid;
+  }
 `;
 
 const SummaryTitle = styled.div`
@@ -181,6 +203,10 @@ const Table = styled.table`
   width: 100%;
   border-collapse: collapse;
   margin: 16px 0;
+
+  @media print {
+    width: 100%;
+  }
 `;
 
 const TableHeader = styled.th`
@@ -207,6 +233,10 @@ const ButtonGroup = styled.div`
   display: flex;
   gap: 12px;
   margin-top: 24px;
+
+  @media print {
+    display: none; // Ẩn nút khi in
+  }
 `;
 
 const Button = styled.button`
@@ -290,7 +320,6 @@ const ReportsAnalytics = () => {
   const [devices, setDevices] = useState([]);
   const [loadMode, setLoadMode] = useState({ modeLoading: true, results: [] });
 
-
   // Hàm xử lý xuất báo cáo PDF
   const exportPDF = () => {
     const doc = new jsPDF();
@@ -332,7 +361,6 @@ const ReportsAnalytics = () => {
       if (response.success) {
         console.log("Dữ liệu thiết bị nhận về:", response.devices);
         setDevices(response.devices);
-        // setFilteredDevices(response.devices);
       } else {
         // setSnackbar({
         //   open: true,
@@ -461,7 +489,6 @@ const ReportsAnalytics = () => {
     ? displayData[0].average
     : null;
 
-
   useEffect(() => {
     const fetchModeData = async () => {
       try {
@@ -529,17 +556,6 @@ const ReportsAnalytics = () => {
               </option>
             ))}
           </Select>
-          {/* <Select
-            value={zoneFilter}
-            onChange={(e) => setZoneFilter(e.target.value)}
-            theme={theme}
-          >
-            <option value="all">Tất cả khu vực</option>
-            <option value="front">Vườn trước</option>
-            <option value="back">Vườn sau</option>
-            <option value="vegetables">Khu rau</option>
-            <option value="flowers">Khu hoa</option>
-          </Select> */}
         </Filter>
       </FilterContainer>
 
@@ -595,9 +611,7 @@ const ReportsAnalytics = () => {
                 ) : (
                   displayData.map(device => (
                     <div key={device.deviceId}>
-                      {/* <h3>Thiết bị: {device.deviceId}</h3> */}
                       {device.average}%
-                      {/* render biểu đồ nếu cần từ device.daily */}
                     </div>
                   ))
                 )}
@@ -627,9 +641,7 @@ const ReportsAnalytics = () => {
                 </CardTitle>
               </CardHeader>
               <ResponsiveContainer width="100%" height={300}>
-                <LineChart
-                  data={moistureData}
-                >
+                <LineChart data={moistureData}>
                   <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />
                   <XAxis dataKey="date" stroke={theme.palette.text.secondary} />
                   <YAxis stroke={theme.palette.text.secondary} />
@@ -642,9 +654,9 @@ const ReportsAnalytics = () => {
                   />
                   <Line
                     type="monotone"
-                    dataKey="average" // Lấy giá trị độ ẩm trung bình
+                    dataKey="average"
                     name="Độ ẩm trung bình đất"
-                    stroke="#8884d8" // Chọn màu cho line
+                    stroke="#8884d8"
                     activeDot={{ r: 8 }}
                   />
                 </LineChart>
@@ -669,7 +681,7 @@ const ReportsAnalytics = () => {
                       color: theme.palette.text.primary
                     }}
                   />
-                  <Legend />
+                  <Legend align="center" verticalAlign="bottom" />
                   <Bar dataKey="autoCount" name="Tự động" fill={theme.palette.primary.main} />
                   <Bar dataKey="manualCount" name="Thủ công" fill={theme.palette.secondary.main} />
                 </BarChart>
@@ -764,7 +776,7 @@ const ReportsAnalytics = () => {
                   color: theme.palette.text.primary
                 }}
               />
-              <Legend />
+              <Legend align="center" verticalAlign="bottom" />
               <Bar dataKey="autoCount" name="Tự động" fill={theme.palette.primary.main} />
               <Bar dataKey="manualCount" name="Thủ công" fill={theme.palette.secondary.main} />
             </BarChart>
