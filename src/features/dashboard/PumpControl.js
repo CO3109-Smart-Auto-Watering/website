@@ -1,227 +1,186 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { FaPowerOff, FaRobot, FaCheck, FaSpinner, FaExclamationTriangle, 
-         FaWater, FaLeaf, FaSlidersH, FaTint, FaClock } from 'react-icons/fa';
+import { alpha, useTheme } from '@mui/material/styles';
+import { 
+  Box, Typography, Button, Divider, Chip, Paper, 
+  CircularProgress, Alert, Card, CardContent, Grid, 
+  IconButton, Fade, Tooltip, Switch, Snackbar
+} from '@mui/material';
+import { 
+  PowerSettingsNew, SmartToy, Check, Warning, Error as ErrorIcon,
+  WaterDrop, Opacity, Grass, Settings, AccessTime, EnergySavingsLeaf,
+  ToggleOn, ToggleOff, Info, Notifications
+} from '@mui/icons-material';
 import { getLatestSensorData, sendCommand, getAdafruitFeedData } from '../../services/sensorService';
-import { Box, Typography, Button, Divider, Chip } from '@mui/material';
 
-// Styled components
-const StatusMessage = styled.div`
-  display: flex;
-  align-items: center;
-  padding: 12px;
-  background-color: ${props => 
-    props.error ? '#FEE2E2' : 
-    props.loading ? '#F3F4F6' : 
-    '#ECFDF5'};
-  color: ${props => 
-    props.error ? '#B91C1C' : 
-    props.loading ? '#4B5563' : 
-    '#047857'};
-  border-radius: 6px;
+// Styled components with theme support
+const ControlWrapper = styled(Box)`
+  padding: 20px;
+  transition: background-color 0.3s ease;
+`;
+
+const StatusAlert = styled(Alert)`
   margin-bottom: 16px;
-  font-size: 14px;
+  animation: fadeIn 0.3s ease;
   
-  svg {
-    margin-right: 8px;
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
   }
 `;
 
-const ModeContainer = styled.div`
-  display: flex;
+const ModeCard = styled(Card)`
   margin-bottom: 16px;
-  border-radius: 8px;
-  overflow: hidden;
-  border: 1px solid #e0e0e0;
-`;
-
-const ModeButton = styled.button`
-  flex: 1;
-  background-color: ${props => props.$active ? '#3f51b5' : 'white'};
-  color: ${props => props.$active ? 'white' : '#333'};
-  border: none;
-  padding: 12px;
-  cursor: pointer;
+  border: 2px solid ${props => props.$active ? 
+    props.theme.palette.primary.main : 
+    'transparent'
+  };
+  background-color: ${props => props.$active ? 
+    alpha(props.theme.palette.primary.main, props.theme.palette.mode === 'dark' ? 0.15 : 0.05) : 
+    props.theme.palette.background.paper
+  };
   transition: all 0.2s ease;
-  font-weight: ${props => props.$active ? 'bold' : 'normal'};
   
   &:hover {
-    background-color: ${props => props.$active ? '#3f51b5' : '#f5f5f5'};
-  }
-  
-  &:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-  }
-`;
-
-const AutoModeMessage = styled.div`
-  display: flex;
-  align-items: center;
-  background-color: #E0F2FE;
-  color: #0369A1;
-  padding: 12px;
-  border-radius: 6px;
-  font-size: 14px;
-  margin-bottom: 16px;
-  
-  svg {
-    margin-right: 8px;
+    border-color: ${props => props.$active ? 
+      props.theme.palette.primary.main : 
+      alpha(props.theme.palette.primary.main, 0.5)
+    };
+    box-shadow: ${props => props.$active ? 
+      props.theme.shadows[4] : 
+      props.theme.shadows[1]
+    };
   }
 `;
 
-const PumpControlContainer = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 16px;
-`;
-
-const PumpButton = styled.button`
-  width: 80px;
-  height: 80px;
-  border-radius: 50%;
-  border: none;
-  background-color: ${props => props.$active ? '#ef4444' : '#e0e0e0'};
-  color: ${props => props.$active ? 'white' : '#333'};
-  font-size: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  
-  &:hover {
-    transform: scale(1.05);
-    box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
-  }
-  
-  &:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-  }
-  
-  svg {
-    filter: ${props => props.$active ? 'drop-shadow(0 0 2px rgba(255, 255, 255, 0.5))' : 'none'};
-  }
-`;
-
-const PumpStatus = styled.div`
-  font-size: 16px;
-  font-weight: 500;
-  color: ${props => props.$active ? '#ef4444' : '#666'};
-`;
-
-// Styled components mới
-const ControlPanel = styled.div`
+const ThresholdContainer = styled(Paper)`
   padding: 16px;
-`;
-
-const ModeSelector = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
   margin-bottom: 20px;
-`;
-
-const ModeCard = styled.div`
-  padding: 16px;
+  background: ${props => props.theme.palette.mode === 'dark' ? 
+    alpha(props.theme.palette.background.paper, 0.8) : 
+    props.theme.palette.background.paper
+  };
+  border: 1px solid ${props => props.theme.palette.divider};
   border-radius: 8px;
-  border: 2px solid ${props => props.$active ? '#3f51b5' : '#e0e0e0'};
-  background-color: ${props => props.$active ? 'rgba(63, 81, 181, 0.05)' : 'white'};
-  cursor: pointer;
-  transition: all 0.2s ease;
-  
-  &:hover {
-    border-color: #3f51b5;
-    background-color: ${props => props.$active ? 'rgba(63, 81, 181, 0.05)' : 'rgba(63, 81, 181, 0.02)'};
-  }
-  
-  &:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-  }
 `;
 
-const ModeTitle = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 16px;
-  font-weight: 600;
-  margin-bottom: 8px;
-  color: ${props => props.$active ? '#3f51b5' : '#333'};
-`;
-
-const ModeDescription = styled.div`
-  font-size: 14px;
-  color: #666;
-`;
-
-const InfoItem = styled.div`
-  display: flex;
-  align-items: center;
-  margin-bottom: 8px;
-  
-  svg {
-    color: #3f51b5;
-    margin-right: 8px;
-    min-width: 16px;
-  }
-`;
-
-const MoistureBar = styled.div`
+const MoistureBar = styled(Box)`
   width: 100%;
   height: 24px;
-  background-color: #f0f0f0;
+  background-color: ${props => props.theme.palette.mode === 'dark' ? 
+    alpha(props.theme.palette.background.paper, 0.2) : 
+    alpha(props.theme.palette.grey[300], 0.6)
+  };
   border-radius: 12px;
   overflow: hidden;
-  margin: 8px 0 16px 0;
+  margin: 16px 0;
   position: relative;
 `;
 
-const MoistureValue = styled.div`
+const MoistureValue = styled(Box)`
   height: 100%;
   width: ${props => props.value}%;
-  background-color: ${props => {
-    if (props.value < props.min) return '#ef4444';
-    if (props.value > props.max) return '#3b82f6';
-    return '#10b981';
+  background: ${props => {
+    const value = props.value;
+    const min = props.min;
+    const max = props.max;
+    
+    if (value < min) 
+      return props.theme.palette.error.main;
+    if (value > max) 
+      return props.theme.palette.info.main;
+    return props.theme.palette.success.main;
   }};
   transition: width 0.5s ease;
 `;
 
-const MoistureMarker = styled.div`
+const MoistureMarker = styled(Box)`
   position: absolute;
   top: 0;
   bottom: 0;
-  width: 2px;
-  background-color: ${props => props.isMax ? '#3b82f6' : '#ef4444'};
+  width: 3px;
+  background-color: ${props => props.isMax ? 
+    props.theme.palette.info.main : 
+    props.theme.palette.error.main
+  };
   left: ${props => props.position}%;
   
-  &:after {
-    content: '${props => props.value}%';
+  &::after {
+    content: "${props => props.value}%";
     position: absolute;
-    top: -20px;
+    top: -25px;
     left: 50%;
     transform: translateX(-50%);
     font-size: 12px;
+    background-color: ${props => props.isMax ? 
+      props.theme.palette.info.main : 
+      props.theme.palette.error.main
+    };
+    color: ${props => props.theme.palette.common.white};
+    padding: 2px 6px;
+    border-radius: 4px;
     white-space: nowrap;
   }
 `;
 
-const ThresholdCard = styled.div`
-  background-color: #f9fafb;
-  border-radius: 8px;
-  padding: 16px;
-  margin-bottom: 16px;
-  border: 1px solid #e5e7eb;
+const PumpButton = styled(IconButton)`
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: ${props => props.$active ? 
+    `linear-gradient(45deg, ${props.theme.palette.error.dark}, ${props.theme.palette.error.main})` : 
+    props.theme.palette.mode === 'dark' ? 
+      alpha(props.theme.palette.grey[800], 0.8) :
+      alpha(props.theme.palette.grey[300], 0.8)
+  };
+  color: ${props => props.$active ? 
+    props.theme.palette.common.white : 
+    props.theme.palette.text.primary
+  };
+  box-shadow: ${props => props.$active ? 
+    `0 0 20px ${alpha(props.theme.palette.error.main, 0.5)}` : 
+    'none'
+  };
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  
+  &:hover {
+    transform: ${props => props.disabled ? 'none' : 'scale(1.05)'};
+    background: ${props => props.$active ? 
+      `linear-gradient(45deg, ${props.theme.palette.error.dark}, ${props.theme.palette.error.main})` : 
+      alpha(props.theme.palette.primary.main, 0.1)
+    };
+  }
+  
+  &:disabled {
+    opacity: 0.6;
+  }
+`;
+
+const NotificationChip = styled(Chip)`
+  animation: pulse 2s infinite;
+  background-color: ${props => props.type === 'on' ? 
+    alpha(props.theme.palette.success.main, 0.9) : 
+    alpha(props.theme.palette.info.main, 0.9)
+  };
+  color: ${props => props.theme.palette.common.white};
+  
+  @keyframes pulse {
+    0% { box-shadow: 0 0 0 0 ${props => props.type === 'on' ? 
+      alpha(props.theme.palette.success.main, 0.7) : 
+      alpha(props.theme.palette.info.main, 0.7)
+    }; }
+    70% { box-shadow: 0 0 0 10px ${props => 
+      alpha(props.theme.palette.background.paper, 0)
+    }; }
+    100% { box-shadow: 0 0 0 0 ${props => 
+      alpha(props.theme.palette.background.paper, 0)
+    }; }
+  }
 `;
 
 const PumpControl = ({ 
-  isAutoThresholdActive = false, 
-  onEnableAutoThreshold, 
+  isAutoThresholdActive = false,
+  onEnableAutoThreshold,
   onDisableAutoThreshold,
   deviceInfo = {},
   currentSoilMoisture = 0,
@@ -229,184 +188,81 @@ const PumpControl = ({
   deviceAreaMap = {},
   selectedDevice = ''
 }) => {
-  const [pumpMode, setPumpMode] = useState(null);   // '1': manual, '0': auto
-  const [pumpActive, setPumpActive] = useState(false); 
+  const theme = useTheme();
+  
+  const [pumpMode, setPumpMode] = useState(null);
+  const [pumpActive, setPumpActive] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
   const [statusMsg, setStatusMsg] = useState('');
   const [isInternalAutoMode, setIsInternalAutoMode] = useState(false);
-  
-  // State để theo dõi độ ẩm hiện tại
   const [soilMoisture, setSoilMoisture] = useState(currentSoilMoisture);
+  
+  // Thêm state cho thông báo khi tự động bật/tắt máy bơm
+  const [notification, setNotification] = useState({
+    show: false,
+    message: '',
+    type: 'info' // 'on', 'off', 'info'
+  });
   
   // Cập nhật độ ẩm từ prop
   useEffect(() => {
     setSoilMoisture(currentSoilMoisture);
   }, [currentSoilMoisture]);
 
-  // Cập nhật độ ẩm từ Adafruit nếu không có prop
-  useEffect(() => {
-    if (currentSoilMoisture === 0) {
-      const fetchSoilMoisture = async () => {
-        try {
-          const soilData = await getAdafruitFeedData('sensor-soil');
-          if (soilData !== null) {
-            setSoilMoisture(parseInt(soilData, 10));
-          }
-        } catch (error) {
-          console.error('Error fetching soil moisture:', error);
-        }
-      };
-      
-      fetchSoilMoisture();
-      const interval = setInterval(fetchSoilMoisture, 10000);
-      return () => clearInterval(interval);
-    }
-  }, [currentSoilMoisture]);
-
-  useEffect(() => {
-    if (selectedDevice) {
-      console.log(`Cập nhật trạng thái bơm cho thiết bị: ${selectedDevice}`);
-      
-      // Fetch trạng thái mới của thiết bị khi chuyển đổi
-      const fetchDeviceState = async () => {
-        try {
-          setLoading(true);
-          const response = await getLatestSensorData(selectedDevice);
-          console.log(`Dữ liệu điều khiển bơm cho device ${selectedDevice}:`, response);
-          
-          if (response && response.data) {
-            // Cập nhật trạng thái bơm và chế độ
-            const modeValue = response.data['mode']?.value || '1';
-            setPumpMode(modeValue);
-            
-            if (response.data['pump-motor']) {
-              setPumpActive(response.data['pump-motor'].value === '1');
-            }
-          }
-        } catch (error) {
-          console.error(`Error fetching device state for ${selectedDevice}:`, error);
-        } finally {
-          setLoading(false);
-        }
-      };
-      
-      fetchDeviceState();
-      
-      // Cập nhật độ ẩm đất cho thiết bị
-      const fetchSoilMoisture = async () => {
-        try {
-          const soilData = await getAdafruitFeedData('sensor-soil', selectedDevice);
-          if (soilData !== null) {
-            setSoilMoisture(parseInt(soilData, 10));
-          }
-        } catch (error) {
-          console.error(`Error fetching soil moisture for device ${selectedDevice}:`, error);
-        }
-      };
-      
-      fetchSoilMoisture();
-    }
-  }, [selectedDevice]);
-
-  // Fetch initial state from backend
-  useEffect(() => {
-    const fetchPumpState = async () => {
-      try {
-        const response = await getLatestSensorData(selectedDevice);
-        console.log(`Pump control data for device ${selectedDevice}:`, response);
-        
-        // If response is successful and data exists
-        if (response && response.data) {
-          // Set mode (default to manual if null)
-          const modeValue = response.data['mode']?.value || '1'; // Default to manual (1)
-          setPumpMode(modeValue);
-          
-          // Set pump state (default to off if null)
-          if (response.data['pump-motor']) { 
-            setPumpActive(response.data['pump-motor'].value === '1');
-          }
-        } else {
-          // If no data, default to manual mode with pump off
-          setPumpMode('1'); // Default to manual (1)
-          setPumpActive(false);
-        }
-      } catch (error) {
-        console.error(`Error fetching pump state for device ${selectedDevice}:`, error);
-        setError(true);
-        
-        // Default to manual mode when error occurs
-        setPumpMode('1'); // Default to manual (1)
-        setPumpActive(false);
-      }
-    };
-    
-    if (selectedDevice) {
-      fetchPumpState();
-      
-      // Set up polling to refresh pump state
-      const interval = setInterval(fetchPumpState, 10000);
-      return () => clearInterval(interval);
-    }
-  }, [selectedDevice]);
-  
-
-  // Hàm lấy thông tin ngưỡng độ ẩm trực tiếp từ dữ liệu cây trồng
+  // Lấy ngưỡng độ ẩm
   const getPlantMoistureThresholds = () => {
-    // Giá trị mặc định
     const defaultThresholds = { min: 30, max: 70 };
     
-    // Kiểm tra điều kiện cần thiết
     if (!selectedDevice || !deviceAreaMap || !areas || areas.length === 0) {
-      console.log('Không đủ thông tin để xác định ngưỡng độ ẩm, sử dụng giá trị mặc định');
       return defaultThresholds;
     }
     
-    // Lấy mapping cho thiết bị được chọn
     const mapping = deviceAreaMap[selectedDevice];
-    if (!mapping) {
-      console.log(`Không tìm thấy mapping cho thiết bị ${selectedDevice}`);
-      return defaultThresholds;
-    }
+    if (!mapping) return defaultThresholds;
     
-    // Tìm khu vực tương ứng
     const area = areas.find(a => a._id === mapping.areaId);
-    if (!area) {
-      console.log(`Không tìm thấy khu vực có ID ${mapping.areaId}`);
-      return defaultThresholds;
-    }
+    if (!area) return defaultThresholds;
     
-    // Kiểm tra dữ liệu cây trồng
     if (mapping.plantIndex >= 0 && area.plants && area.plants[mapping.plantIndex]) {
       const plant = area.plants[mapping.plantIndex];
       const min = plant.moistureThreshold?.min || defaultThresholds.min;
       const max = plant.moistureThreshold?.max || defaultThresholds.max;
-      
       return { min, max };
     }
     
-    console.log('Không tìm thấy thông tin cây trồng, sử dụng giá trị mặc định');
     return defaultThresholds;
   };
 
-  // Lấy ngưỡng độ ẩm từ deviceInfo và áp dụng giá trị mặc định mới
-  const minThreshold = getPlantMoistureThresholds().min || deviceInfo.moistureMinThreshold || 30;
-  
-  const maxThreshold = getPlantMoistureThresholds().max || deviceInfo.moistureMaxThreshold || 70;
+  const minThreshold = getPlantMoistureThresholds().min;
+  const maxThreshold = getPlantMoistureThresholds().max;
 
-  // Effect để tự động điều khiển bơm khi ở chế độ tự động
+  // Effect để tự động điều khiển bơm 
   useEffect(() => {
     if ((isAutoThresholdActive || isInternalAutoMode) && pumpMode === '0') {
       const autoControl = async () => {
         try {
           if (soilMoisture < minThreshold && !pumpActive) {
-            await sendCommand('pump-motor', 1);
+            await sendCommand('pump-motor', 1, selectedDevice);
             setPumpActive(true);
-            console.log('Auto turned on pump - soil moisture below threshold');
+            
+            // Hiển thị thông báo khi bật máy bơm
+            setNotification({
+              show: true,
+              message: `Độ ẩm đất (${soilMoisture}%) thấp hơn ngưỡng ${minThreshold}% - Đang tự động tưới nước`,
+              type: 'on'
+            });
+            
           } else if (soilMoisture >= maxThreshold && pumpActive) {
-            await sendCommand('pump-motor', 0);
+            await sendCommand('pump-motor', 0, selectedDevice);
             setPumpActive(false);
-            console.log('Auto turned off pump - soil moisture above threshold');
+            
+            // Hiển thị thông báo khi tắt máy bơm
+            setNotification({
+              show: true,
+              message: `Độ ẩm đất đã đạt ${soilMoisture}% (ngưỡng tối đa ${maxThreshold}%) - Đã tự động tắt máy bơm`,
+              type: 'off'
+            });
           }
         } catch (error) {
           console.error('Error in auto control:', error);
@@ -417,43 +273,72 @@ const PumpControl = ({
       const interval = setInterval(autoControl, 30000);
       return () => clearInterval(interval);
     }
-  }, [isAutoThresholdActive, isInternalAutoMode, pumpMode, soilMoisture, minThreshold, maxThreshold, pumpActive]);
+  }, [isAutoThresholdActive, isInternalAutoMode, pumpMode, soilMoisture, minThreshold, maxThreshold, pumpActive, selectedDevice]);
 
-  // Handle mode change (auto/manual)
-  const handleModeClick = async (modeValue) => {
-    // Không cho phép thay đổi chế độ nếu đang ở chế độ tự động ngưỡng
-    if (isAutoThresholdActive && modeValue === 1) {
-      setError(true);
-      setStatusMsg('Vui lòng tắt chế độ tự động ngưỡng trước khi chuyển sang điều khiển thủ công');
-      return;
+  // Fetch trạng thái máy bơm
+  useEffect(() => {
+    if (selectedDevice) {
+      const fetchPumpState = async () => {
+        try {
+          const response = await getLatestSensorData(selectedDevice);
+          
+          if (response && response.data) {
+            // Lấy mode (mặc định là thủ công)
+            const modeValue = response.data['mode']?.value || '1';
+            setPumpMode(modeValue);
+            
+            // Lấy trạng thái máy bơm
+            if (response.data['pump-motor']) {
+              setPumpActive(response.data['pump-motor'].value === '1');
+            }
+          } else {
+            // Mặc định là chế độ thủ công khi không có dữ liệu
+            setPumpMode('1');
+            setPumpActive(false);
+          }
+        } catch (error) {
+          console.error(`Error fetching pump state for device ${selectedDevice}:`, error);
+          setPumpMode('1');
+          setPumpActive(false);
+        }
+      };
+      
+      fetchPumpState();
+      const interval = setInterval(fetchPumpState, 10000);
+      return () => clearInterval(interval);
     }
-    
+  }, [selectedDevice]);
+
+  // Chuyển chế độ điều khiển - Đơn giản hóa để dễ chuyển đổi giữa các chế độ
+  const handleModeClick = async (modeValue) => {
     try {
       setLoading(true);
       setError(false);
       setStatusMsg('Đang chuyển chế độ điều khiển...');
       
-      await sendCommand('mode', modeValue, selectedDevice);
-      setPumpMode(modeValue.toString());
-      
-      // If switching to manual mode, ensure pump is off by default
-      if (modeValue === 1) {
-        await sendCommand('pump-motor', 0, selectedDevice);
-        setPumpActive(false);
+      // Nếu đang ở chế độ tự động và muốn chuyển sang thủ công
+      if ((isAutoThresholdActive || isInternalAutoMode) && modeValue === 1) {
+        // Nếu có hàm callback từ parent component
+        if (typeof onDisableAutoThreshold === 'function') {
+          onDisableAutoThreshold();
+        }
         setIsInternalAutoMode(false);
       }
       
-      // Store the success message in a variable
+      await sendCommand('mode', modeValue, selectedDevice);
+      setPumpMode(modeValue.toString());
+      
+      await sendCommand('pump-motor', 0, selectedDevice);
+      setPumpActive(false);
+      
       const successMsg = `Đã chuyển sang chế độ ${modeValue === 0 ? 'tự động' : 'thủ công'} thành công`;
       setStatusMsg(successMsg);
       
-      // Auto-clear this specific success message after 3 seconds
       setTimeout(() => {
         setStatusMsg(current => current === successMsg ? '' : current);
       }, 3000);
       
     } catch (error) {
-      console.error(`Error updating pump mode for device ${selectedDevice}:`, error);
       setError(true);
       setStatusMsg('Lỗi khi cập nhật chế độ điều khiển');
     } finally {
@@ -461,85 +346,85 @@ const PumpControl = ({
     }
   };
 
+  // Bật/tắt chế độ tự động theo ngưỡng độ ẩm
   const handleAutoThresholdClick = async () => {
     if (isAutoThresholdActive || isInternalAutoMode) {
-      // Nếu đang bật, tắt chế độ tự động ngưỡng
+      // Tắt chế độ tự động
       if (typeof onDisableAutoThreshold === 'function') {
         onDisableAutoThreshold();
-      } else {
-        try {
-          setLoading(true);
-          setError(false);
-          setStatusMsg('Đang tắt chế độ tưới tự động...');
-          
-          // Chuyển sang chế độ thủ công và tắt bơm
-          await sendCommand('mode', 1, selectedDevice);
-          await sendCommand('pump-motor', 0, selectedDevice);
-          setPumpMode('1');
-          setPumpActive(false);
-          setIsInternalAutoMode(false);
-          
-          const successMsg = 'Đã tắt chế độ tưới tự động thành công';
-          setStatusMsg(successMsg);
-          
-          setTimeout(() => {
-            setStatusMsg(current => current === successMsg ? '' : current);
-          }, 3000);
-        } catch (error) {
-          console.error(`Error disabling auto threshold mode for device ${selectedDevice}:`, error);
-          setError(true);
-          setStatusMsg('Lỗi khi tắt chế độ tưới tự động');
-        } finally {
-          setLoading(false);
-        }
+      }
+      
+      try {
+        setLoading(true);
+        setError(false);
+        setStatusMsg('Đang tắt chế độ tưới tự động...');
+        
+        await sendCommand('mode', 1, selectedDevice);
+        await sendCommand('pump-motor', 0, selectedDevice);
+        setPumpMode('1');
+        setPumpActive(false);
+        setIsInternalAutoMode(false);
+        
+        const successMsg = 'Đã tắt chế độ tưới tự động thành công';
+        setStatusMsg(successMsg);
+        
+        setTimeout(() => {
+          setStatusMsg(current => current === successMsg ? '' : current);
+        }, 3000);
+      } catch (error) {
+        setError(true);
+        setStatusMsg('Lỗi khi tắt chế độ tưới tự động');
+      } finally {
+        setLoading(false);
       }
     } else {
-      // Nếu đang tắt, bật chế độ tự động ngưỡng
+      // Bật chế độ tự động
       if (typeof onEnableAutoThreshold === 'function') {
         onEnableAutoThreshold();
-      } else {
-        try {
-          setLoading(true);
-          setError(false);
-          setStatusMsg('Đang bật chế độ tưới tự động...');
+      }
+      
+      try {
+        setLoading(true);
+        setError(false);
+        setStatusMsg('Đang bật chế độ tưới tự động...');
+        
+        // Kiểm tra và điều chỉnh máy bơm dựa trên độ ẩm hiện tại
+        if (soilMoisture < minThreshold) {
+          console.log('Soil moisture is low, turning on pump...');
+          await sendCommand('pump-motor', 1, selectedDevice);
+          setPumpActive(true);
           
-          // Áp dụng ngưỡng độ ẩm từ thông tin cây trồng
-          // Chuyển sang chế độ tự động
-          await sendCommand('mode', 0);
-          
-          // Kiểm tra độ ẩm hiện tại và điều khiển bơm
-          if (soilMoisture < minThreshold) {
-            await sendCommand('pump-motor', 1);
-            setPumpActive(true);
-          } else if (soilMoisture >= maxThreshold) {
-            await sendCommand('pump-motor', 0);
-            setPumpActive(false);
-          }
-          
-          setPumpMode('0');
-          setIsInternalAutoMode(true);
-          
-          const successMsg = 'Đã bật chế độ tưới tự động thành công';
-          setStatusMsg(successMsg);
-          
-          setTimeout(() => {
-            setStatusMsg(current => current === successMsg ? '' : current);
-          }, 3000);
-        } catch (error) {
-          console.error('Error enabling auto threshold mode:', error);
-          setError(true);
-          setStatusMsg('Lỗi khi bật chế độ tưới tự động');
-        } finally {
-          setLoading(false);
+          // Thông báo bật máy bơm
+          setNotification({
+            show: true,
+            message: `Độ ẩm đất (${soilMoisture}%) thấp hơn ngưỡng ${minThreshold}% - Đang tự động tưới nước`,
+            type: 'on'
+          });
+        } else if (soilMoisture >= maxThreshold) {
+          await sendCommand('pump-motor', 0, selectedDevice);
+          setPumpActive(false);
         }
+        
+        setPumpMode('0');
+        setIsInternalAutoMode(true);
+        
+        const successMsg = 'Đã bật chế độ tưới tự động thành công';
+        setStatusMsg(successMsg);
+        
+        setTimeout(() => {
+          setStatusMsg(current => current === successMsg ? '' : current);
+        }, 3000);
+      } catch (error) {
+        setError(true);
+        setStatusMsg('Lỗi khi bật chế độ tưới tự động');
+      } finally {
+        setLoading(false);
       }
     }
   };
   
-  // Toggle pump function
+  // Bật/tắt máy bơm trực tiếp
   const togglePump = async () => {
-    if (pumpMode !== '1') return;
-    
     try {
       setLoading(true);
       setError(false);
@@ -549,200 +434,318 @@ const PumpControl = ({
       await sendCommand('pump-motor', newState, selectedDevice);
       setPumpActive(newState === 1);
       
-      // Store the success message in a variable
       const successMsg = `Đã ${newState === 1 ? 'bật' : 'tắt'} máy bơm thành công`;
       setStatusMsg(successMsg);
       
-      // Auto-clear this specific success message after 3 seconds
       setTimeout(() => {
         setStatusMsg(current => current === successMsg ? '' : current);
       }, 3000);
       
     } catch (error) {
-      console.error(`Error toggling pump for device ${selectedDevice}:`, error);
       setError(true);
       setStatusMsg('Lỗi khi bật/tắt máy bơm');
     } finally {
       setLoading(false);
     }
   };
-
-  // Show loading state if mode is not fetched yet
+  
+  // Đóng thông báo
+  const handleCloseNotification = () => {
+    setNotification(prev => ({ ...prev, show: false }));
+  };
+  
+  // Hiển thị trạng thái loading
   if (pumpMode === null) {
     return (
-      <ControlPanel>
-        <Box display="flex" justifyContent="center" alignItems="center" p={4}>
-          <FaSpinner className="fa-spin" style={{ marginRight: '8px' }} />
-          <Typography>Đang tải trạng thái điều khiển...</Typography>
-        </Box>
-      </ControlPanel>
+      <Box sx={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        p: 4, 
+        minHeight: 200 
+      }}>
+        <CircularProgress size={40} thickness={5} sx={{ mr: 2 }} />
+        <Typography variant="h6">Đang tải dữ liệu điều khiển...</Typography>
+      </Box>
     );
   }
 
   return (
-    <ControlPanel>
-      {/* Status message with icons */}
+    <ControlWrapper theme={theme}>
+      {/* Thông báo trạng thái */}
       {statusMsg && (
-        <StatusMessage error={error} loading={loading}>
-          {error ? <FaExclamationTriangle /> : 
-           loading ? <FaSpinner className="fa-spin" /> : 
-           <FaCheck />}
-          {statusMsg}
-        </StatusMessage>
-      )}
-      
-      {/* Moisture bar with threshold markers */}
-      <ThresholdCard>
-        <Typography variant="subtitle2" sx={{ mb: 1, display: 'flex', alignItems: 'center' }}>
-          <FaWater style={{ marginRight: '8px', color: '#3f51b5' }} /> 
-          Độ ẩm đất hiện tại: <strong style={{ marginLeft: '8px' }}>{soilMoisture}%</strong>
-          <Chip 
-            size="small" 
-            label={
-              soilMoisture < minThreshold ? "Quá khô" : 
-              soilMoisture > maxThreshold ? "Quá ẩm" : 
-              "Lý tưởng"
-            }
-            color={
-              soilMoisture < minThreshold ? "error" : 
-              soilMoisture > maxThreshold ? "info" : 
-              "success"
-            }
-            sx={{ ml: 'auto' }}
-          />
-        </Typography>
-        
-        <MoistureBar>
-          <MoistureValue 
-            value={soilMoisture} 
-            min={minThreshold} 
-            max={maxThreshold}
-          />
-          <MoistureMarker position={minThreshold} value={minThreshold} />
-          <MoistureMarker position={maxThreshold} value={maxThreshold} isMax />
-        </MoistureBar>
-        
-        {/* Plant info if available */}
-        {deviceInfo.plantName && (
-          <>
-            <InfoItem>
-              <FaLeaf />
-              <Typography variant="body2">
-                <strong>Cây trồng:</strong> {deviceInfo.plantName}
-              </Typography>
-            </InfoItem>
-            <InfoItem>
-              <FaSlidersH />
-              <Typography variant="body2">
-                <strong>Ngưỡng độ ẩm khuyến nghị:</strong> {minThreshold}% - {maxThreshold}%
-              </Typography>
-            </InfoItem>
-          </>
-        )}
-      </ThresholdCard>
-      
-      <Divider sx={{ my: 2 }} />
-      
-      <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 'bold' }}>
-        Chọn chế độ điều khiển
-      </Typography>
-      
-      <ModeSelector>
-        {/* Auto threshold mode */}
-        <ModeCard 
-          $active={isAutoThresholdActive || isInternalAutoMode}
-          onClick={handleAutoThresholdClick}
-          disabled={loading}
-        >
-          <ModeTitle $active={isAutoThresholdActive || isInternalAutoMode}>
-            <FaRobot /> Tưới tự động theo ngưỡng độ ẩm
-          </ModeTitle>
-          <ModeDescription>
-            Máy bơm sẽ tự động bật khi độ ẩm dưới {minThreshold}% và tắt khi độ ẩm đạt {maxThreshold}%.
-          </ModeDescription>
-          {(isAutoThresholdActive || isInternalAutoMode) && (
-            <Typography 
-              variant="body2" 
-              sx={{ 
-                mt: 1, 
-                p: 1, 
-                bgcolor: 'rgba(16, 185, 129, 0.1)', 
-                borderRadius: 1,
-                color: 'rgb(16, 185, 129)',
-                display: 'flex',
-                alignItems: 'center'
-              }}
-            >
-              <FaCheck style={{ marginRight: '4px' }} /> Đang hoạt động
-            </Typography>
-          )}
-        </ModeCard>
-        
-        {/* Manual mode */}
-        <ModeCard 
-          $active={!isAutoThresholdActive && !isInternalAutoMode && pumpMode === '1'}
-          onClick={() => !isAutoThresholdActive && !isInternalAutoMode && handleModeClick(1)}
-          disabled={loading || isAutoThresholdActive || isInternalAutoMode}
-        >
-          <ModeTitle $active={!isAutoThresholdActive && !isInternalAutoMode && pumpMode === '1'}>
-            <FaPowerOff /> Điều khiển thủ công
-          </ModeTitle>
-          <ModeDescription>
-            Điều khiển trực tiếp máy bơm bằng nút bật/tắt.
-          </ModeDescription>
-          {!isAutoThresholdActive && !isInternalAutoMode && pumpMode === '1' && (
-            <Typography 
-              variant="body2" 
-              sx={{ 
-                mt: 1, 
-                p: 1, 
-                bgcolor: 'rgba(239, 68, 68, 0.1)', 
-                borderRadius: 1,
-                color: 'rgb(239, 68, 68)',
-                display: 'flex',
-                alignItems: 'center'
-              }}
-            >
-              <FaCheck style={{ marginRight: '4px' }} /> Đang hoạt động
-            </Typography>
-          )}
-        </ModeCard>
-      </ModeSelector>
-      
-      {/* Manual control pump button */}
-      {!isAutoThresholdActive && !isInternalAutoMode && pumpMode === '1' && (
-        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mt: 3 }}>
-          <PumpButton 
-            $active={pumpActive} 
-            onClick={togglePump}
-            disabled={loading}
+        <Fade in={!!statusMsg}>
+          <StatusAlert 
+            severity={error ? 'error' : loading ? 'info' : 'success'}
+            icon={error ? <ErrorIcon /> : loading ? <CircularProgress size={20} thickness={5} /> : <Check />}
           >
-            <FaPowerOff />
-          </PumpButton>
-          <PumpStatus $active={pumpActive}>
-            {pumpActive ? 'Máy bơm đang hoạt động' : 'Máy bơm đã tắt'}
-          </PumpStatus>
-        </Box>
+            {statusMsg}
+          </StatusAlert>
+        </Fade>
       )}
-    </ControlPanel>
+      
+      {/* Thông báo tự động */}
+      <Snackbar 
+        open={notification.show} 
+        autoHideDuration={10000} 
+        onClose={handleCloseNotification}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert
+          severity={notification.type === 'on' ? 'success' : 'info'}
+          icon={notification.type === 'on' ? 
+            <WaterDrop sx={{ animation: 'pulse 1s infinite' }} /> : 
+            <Info />
+          }
+          onClose={handleCloseNotification}
+          sx={{ 
+            width: '100%', 
+            boxShadow: theme.shadows[4]
+          }}
+          action={
+            <NotificationChip
+              theme={theme}
+              type={notification.type}
+              icon={notification.type === 'on' ? <ToggleOn /> : <ToggleOff />}
+              label={notification.type === 'on' ? 'Đang tưới' : 'Đã tắt'}
+              size="small"
+            />
+          }
+        >
+          <Typography variant="body2">{notification.message}</Typography>
+        </Alert>
+      </Snackbar>
+      
+      {/* Hiển thị thông tin độ ẩm đất và ngưỡng */}
+      <ThresholdContainer theme={theme} elevation={theme.palette.mode === 'dark' ? 2 : 1}>
+        <Grid container spacing={2} alignItems="center">
+          <Grid item xs={12} md={8}>
+            <Box display="flex" alignItems="center" mb={1}>
+              <WaterDrop color="primary" sx={{ mr: 1 }} />
+              <Typography variant="subtitle1" fontWeight="medium">
+                Độ ẩm đất hiện tại
+              </Typography>
+              <Chip 
+                size="small" 
+                label={
+                  soilMoisture < minThreshold ? "Quá khô" : 
+                  soilMoisture > maxThreshold ? "Quá ẩm" : 
+                  "Lý tưởng"
+                }
+                color={
+                  soilMoisture < minThreshold ? "error" : 
+                  soilMoisture > maxThreshold ? "info" : 
+                  "success"
+                }
+                sx={{ ml: 2 }}
+              />
+            </Box>
+            
+            <Box display="flex" alignItems="center" mb={2}>
+              <Typography variant="h4" fontWeight="bold" color="primary">
+                {soilMoisture}%
+              </Typography>
+              <Tooltip title={`Ngưỡng tưới: ${minThreshold}% - ${maxThreshold}%`}>
+                <Info fontSize="small" sx={{ ml: 1, color: 'text.secondary' }} />
+              </Tooltip>
+            </Box>
+            
+            <MoistureBar theme={theme}>
+              <MoistureValue 
+                theme={theme}
+                value={soilMoisture} 
+                min={minThreshold} 
+                max={maxThreshold}
+              />
+              <MoistureMarker theme={theme} position={minThreshold} value={minThreshold} />
+              <MoistureMarker theme={theme} position={maxThreshold} value={maxThreshold} isMax />
+            </MoistureBar>
+          </Grid>
+          
+          <Grid item xs={12} md={4}>
+            <Box p={2} bgcolor={alpha(theme.palette.background.default, 0.5)} borderRadius={1} border={`1px solid ${theme.palette.divider}`}>
+              {deviceInfo.plantName ? (
+                <>
+                  <Box display="flex" alignItems="center" mb={1}>
+                    <Grass color="success" sx={{ mr: 1 }} />
+                    <Typography variant="body2" fontWeight="medium">
+                      {deviceInfo.plantName}
+                    </Typography>
+                  </Box>
+                  
+                  <Box display="flex" alignItems="center" mb={1}>
+                    <Settings fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />
+                    <Typography variant="body2" color="text.secondary">
+                      Ngưỡng tưới: {minThreshold}% - {maxThreshold}%
+                    </Typography>
+                  </Box>
+                  
+                  <Box display="flex" alignItems="center">
+                    <EnergySavingsLeaf fontSize="small" sx={{ mr: 1, color: theme.palette.success.main }} />
+                    <Typography variant="body2" color="text.secondary">
+                      {(isAutoThresholdActive || isInternalAutoMode) ? 'Tưới tự động đã thiết lập' : 'Tưới thủ công'}
+                    </Typography>
+                  </Box>
+                </>
+              ) : (
+                <Box display="flex" alignItems="center" justifyContent="center" height="100%">
+                  <Typography color="text.secondary" textAlign="center">
+                    Chưa có thông tin cây trồng
+                  </Typography>
+                </Box>
+              )}
+            </Box>
+          </Grid>
+        </Grid>
+      </ThresholdContainer>
+      
+      <Typography variant="h6" fontWeight="medium" gutterBottom>
+        Chọn chế độ điều khiển máy bơm
+      </Typography>
+
+      <Grid container spacing={2}>
+        {/* Chế độ tưới tự động */}
+        <Grid item xs={12} md={6}>
+          <ModeCard 
+            theme={theme} 
+            $active={isAutoThresholdActive || isInternalAutoMode}
+            elevation={theme.palette.mode === 'dark' ? 3 : 1}
+            sx={{
+              cursor: loading ? 'wait' : 'pointer',
+              opacity: loading ? 0.7 : 1,
+              height: '100%'
+            }}
+            onClick={() => !loading && handleAutoThresholdClick()}
+          >
+            <CardContent>
+              <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
+                <Box display="flex" alignItems="center">
+                  <SmartToy 
+                    color={isAutoThresholdActive || isInternalAutoMode ? "primary" : "action"} 
+                    sx={{ mr: 1 }}
+                  />
+                  <Typography variant="h6" color={isAutoThresholdActive || isInternalAutoMode ? "primary" : "textPrimary"}>
+                    Tưới tự động
+                  </Typography>
+                </Box>
+              
+              </Box>
+              
+              <Typography variant="body2" color="text.secondary" paragraph>
+                Máy bơm tự động bật khi độ ẩm thấp hơn {minThreshold}% và tắt khi đạt {maxThreshold}%.
+              </Typography>
+              
+              <Box mt={2} display="flex" alignItems="center">
+                <AccessTime fontSize="small" sx={{ color: 'text.secondary', mr: 1 }} />
+                <Typography variant="caption" color="text.secondary">
+                  Tự động kiểm tra mỗi 30 giây
+                </Typography>
+              </Box>
+              
+              {(isAutoThresholdActive || isInternalAutoMode) && (
+                <Fade in={true}>
+                  <Box 
+                    mt={2} 
+                    p={1} 
+                    bgcolor={alpha(theme.palette.success.main, theme.palette.mode === 'dark' ? 0.2 : 0.1)}
+                    borderRadius={1}
+                    display="flex"
+                    alignItems="center"
+                  >
+                    <Check sx={{ color: theme.palette.success.main, mr: 1 }} />
+                    <Typography variant="body2" color="success.main">
+                      Đang hoạt động
+                    </Typography>
+                  </Box>
+                </Fade>
+              )}
+            </CardContent>
+          </ModeCard>
+        </Grid>
+        
+        {/* Chế độ điều khiển thủ công */}
+        <Grid item xs={12} md={6}>
+          <ModeCard 
+            theme={theme} 
+            $active={!isAutoThresholdActive && !isInternalAutoMode && pumpMode === '1'}
+            elevation={theme.palette.mode === 'dark' ? 3 : 1}
+            sx={{
+              cursor: loading ? 'wait' : 'pointer',
+              opacity: loading ? 0.7 : 1,
+              height: '100%'
+            }}
+            onClick={() => !loading && handleModeClick(1)}
+          >
+            <CardContent>
+              <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
+                <Box display="flex" alignItems="center">
+                  <PowerSettingsNew 
+                    color={!isAutoThresholdActive && !isInternalAutoMode && pumpMode === '1' ? "primary" : "action"} 
+                    sx={{ mr: 1 }}
+                  />
+                  <Typography variant="h6" color={!isAutoThresholdActive && !isInternalAutoMode && pumpMode === '1' ? "primary" : "textPrimary"}>
+                    Điều khiển thủ công
+                  </Typography>
+                </Box>
+                
+              </Box>
+              
+              <Typography variant="body2" color="text.secondary" paragraph>
+                Điều khiển trực tiếp máy bơm bằng nút bật/tắt bên dưới.
+              </Typography>
+              
+              {!isAutoThresholdActive && !isInternalAutoMode && pumpMode === '1' ? (
+                <Box 
+                  display="flex" 
+                  flexDirection="column" 
+                  alignItems="center" 
+                  mt={3}
+                  onClick={(e) => e.stopPropagation()} // Ngăn sự kiện lan tới ModeCard
+                >
+                  <PumpButton
+                    theme={theme}
+                    $active={pumpActive}
+                    onClick={(e) => {
+                      e.stopPropagation(); 
+                      togglePump(); 
+                    }}
+                    disabled={loading}
+                    size="large"
+                  >
+                    {loading ? (
+                      <CircularProgress size={30} color="inherit" thickness={5} />
+                    ) : (
+                      <Fade in={true}>
+                        {pumpActive ? <ToggleOn sx={{ fontSize: "3rem" }} /> : <ToggleOff sx={{ fontSize: "3rem" }} />}
+                      </Fade>
+                    )}
+                  </PumpButton>
+                  
+                  <Typography 
+                    variant="subtitle1" 
+                    fontWeight="medium" 
+                    color={pumpActive ? "error" : "text.secondary"}
+                    mt={2}
+                  >
+                    {pumpActive ? 'Máy bơm đang hoạt động' : 'Máy bơm đã tắt'}
+                  </Typography>
+                </Box>
+              ) : (
+                <Box display="flex" alignItems="center" justifyContent="center" mt={3} mb={1}>
+                  <Chip 
+                    icon={<Info fontSize="small" />}
+                    label="Nhấn để kích hoạt chế độ thủ công"
+                    color="primary"
+                    variant="outlined"
+                  />
+                </Box>
+              )}
+            </CardContent>
+          </ModeCard>
+        </Grid>
+      </Grid>
+    </ControlWrapper>
   );
 };
-
-// Add some CSS for the spinner animation
-const style = document.createElement('style');
-style.textContent = `
-  .fa-spin {
-    animation: fa-spin 2s infinite linear;
-  }
-  @keyframes fa-spin {
-    0% {
-      transform: rotate(0deg);
-    }
-    100% {
-      transform: rotate(360deg);
-    }
-  }
-`;
-document.head.appendChild(style);
 
 export default PumpControl;

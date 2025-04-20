@@ -1,4 +1,4 @@
-import React from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Box, List, ListItem, ListItemIcon, ListItemText, Typography,
@@ -10,6 +10,7 @@ import {
   Settings, Logout, WbSunny, NightsStay, Grass
 } from '@mui/icons-material';
 import { useThemeContext } from '../../context/ThemeContext';
+import { getCurrentUser } from '../../services/authService'; // Import getUserProfile
 
 // Styled components with MUI
 const SidebarContainer = styled(Box)(({ theme }) => ({
@@ -85,6 +86,36 @@ const Sidebar = () => {
   const { toggleTheme, currentTheme } = useThemeContext();
   const username = localStorage.getItem('username') || 'User';
 
+  const [userProfile, setUserProfile] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      setLoading(true);
+      try {
+        const response = await getCurrentUser();
+        if (response && response.user) {
+          // Lưu ý: API auth/me thường trả về dữ liệu trong một field "user"
+          setUserProfile(response.user);
+          console.log("Đã tải thành công thông tin người dùng:", response.user);
+        } else {
+          // Fallback to localStorage if API fails
+          const storedUsername = localStorage.getItem('username');
+          setUserProfile({ name: storedUsername || 'User', role: 'User' });
+          console.log("Không thể tải thông tin từ API, sử dụng localStorage");
+        }
+      } catch (error) {
+        console.error("Lỗi khi tải thông tin người dùng:", error);
+        const storedUsername = localStorage.getItem('username');
+        setUserProfile({ name: storedUsername || 'User', role: 'User' });
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchUserProfile();
+  }, []);
+  
   const menuItems = [
     { title: 'Bảng điều khiển', icon: <Dashboard />, path: '/dashboard' },
     { title: 'Lịch tưới', icon: <Schedule />, path: '/schedules' },
@@ -118,13 +149,17 @@ const Sidebar = () => {
       
       <UserSection>
         <Avatar 
-          alt={username}
-          src="/avatar-placeholder.png" 
-          sx={{ width: 40, height: 40 }}
+           alt={userProfile?.name || userProfile?.username || 'User'}
+           src={userProfile?.avatar || "/avatar-placeholder.png"} 
+           sx={{ width: 40, height: 40 }}
         />
         <Box ml={2}>
-          <Typography variant="subtitle2">{username}</Typography>
-          <Typography variant="body2" color="textSecondary">User</Typography>
+        <Typography variant="subtitle2">
+          {userProfile?.name || userProfile?.username || 'User'}
+        </Typography>
+        <Typography variant="body2" color="textSecondary">
+          {userProfile?.email || 'User'}
+        </Typography>
         </Box>
       </UserSection>
       

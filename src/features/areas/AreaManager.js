@@ -602,19 +602,27 @@ const AreaManager = () => {
   const stats = useMemo(() => {
     const totalAreas = areas.length;
     const totalPlants = areas.reduce((sum, area) => sum + (area.plants?.length || 0), 0);
-    
-    // Sửa cách tính số thiết bị liên kết
-    const linkedDevices = areas.reduce((sum, area) => {
-      // Ưu tiên sử dụng areaDevices nếu có
+  
+    const deviceSet = new Set();
+    areas.forEach(area => {
       if (areaDevices[area._id]) {
-        return sum + areaDevices[area._id].length;
+        areaDevices[area._id].forEach(device => {
+          if (devices.some(d => d.deviceId === device.deviceId && d.isActive)) {
+            deviceSet.add(device.deviceId);
+          }
+        });
+      } else if (area.devices) {
+        area.devices.forEach(deviceId => {
+          if (devices.some(d => d.deviceId === deviceId && d.isActive)) {
+            deviceSet.add(deviceId);
+          }
+        });
       }
-      // Fallback về cách cũ
-      return sum + (area.devices?.length || 0);
-    }, 0);
-    
+    });
+    const linkedDevices = deviceSet.size;
+  
     return { totalAreas, totalPlants, linkedDevices };
-  }, [areas, areaDevices]);
+  }, [areas, areaDevices, devices]);
   
   // Reset filters
   const handleResetFilters = () => {
@@ -899,17 +907,16 @@ const AreaManager = () => {
                   }
                   subheader={
                     <Box sx={{ mt: 0.5 }}>
-                      <Chip
-                        size="small"
-                        icon={<LocalFlorist />}
+                      <Chip 
+                        size="small" 
                         label={`${area.plants?.length || 0} cây trồng`}
                         color="primary"
                         variant="outlined"
                         sx={{ mr: 0.5 }}
                       />
-                       <Chip 
+                      <Chip 
                         size="small" 
-                        label={stats.linkedDevices} 
+                        label={getLinkedDevices(area).length} 
                         color="info"
                         icon={<DevicesOther />}
                         variant="outlined"
@@ -1261,7 +1268,7 @@ const AreaManager = () => {
                       <TableCell>
                         <Chip 
                           size="small" 
-                          label={stats.linkedDevices} 
+                          label={getLinkedDevices(area).length} 
                           color="info"
                           icon={<DevicesOther />}
                         />

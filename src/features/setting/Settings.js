@@ -97,7 +97,6 @@ const Settings = () => {
     avatar: null,
     notifyWatering: true,
     notifySystem: true,
-    soundEnabled: true,
     darkMode: currentTheme === 'dark',
   });
 
@@ -149,7 +148,6 @@ const Settings = () => {
           avatar: userData.avatar || prev.avatar,
           notifyWatering: userData.preferences?.notifyWatering ?? prev.notifyWatering,
           notifySystem: userData.preferences?.notifySystem ?? prev.notifySystem,
-          soundEnabled: userData.preferences?.soundEnabled ?? prev.soundEnabled,
         }));
         
         // Save username to localStorage for other components
@@ -233,7 +231,6 @@ const Settings = () => {
         preferences: {
           notifyWatering: profile.notifyWatering,
           notifySystem: profile.notifySystem,
-          soundEnabled: profile.soundEnabled
         }
       };
       
@@ -473,19 +470,6 @@ const Settings = () => {
                         label="Thông báo về trạng thái hệ thống"
                       />
                     </Grid>
-                    <Grid item xs={12}>
-                      <FormControlLabel
-                        control={
-                          <Switch
-                            checked={profile.soundEnabled}
-                            onChange={handleProfileChange}
-                            name="soundEnabled"
-                            color="primary"
-                          />
-                        }
-                        label="Âm thanh thông báo"
-                      />
-                    </Grid>
                   </Grid>
 
                   <Box display="flex" justifyContent="flex-end">
@@ -549,25 +533,6 @@ const Settings = () => {
 
               <Divider sx={{ my: 4 }} />
 
-              <Typography variant="h6" gutterBottom>
-                Cài đặt thiết bị
-              </Typography>
-
-              <Grid container spacing={3}>
-                <Grid item xs={12}>
-                  <FormControlLabel
-                    control={
-                      <Switch
-                        checked={profile.soundEnabled}
-                        onChange={handleProfileChange}
-                        name="soundEnabled"
-                        color="primary"
-                      />
-                    }
-                    label="Âm thanh thiết bị"
-                  />
-                </Grid>
-              </Grid>
 
               <Box display="flex" justifyContent="flex-end" sx={{ mt: 3 }}>
                 <Button

@@ -1,23 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import styled from 'styled-components';
-import { LineChart, Line, BarChart, Bar, PieChart, Pie, AreaChart, Area, 
-  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { FaThermometerHalf, FaTint, FaSeedling, FaPrint, FaRegCalendarAlt, 
-  FaPowerOff, FaMap, FaSlidersH, FaCloudSun, FaMapMarkedAlt, FaLeaf, 
-  FaChartLine, FaWater, FaTools, FaCog, FaRobot } from 'react-icons/fa';
-import { Box, useTheme, TextField, Slider, FormControl, InputLabel, MenuItem, Select, Typography, Button } from '@mui/material';
+import { FaThermometerHalf, FaTint, FaSeedling, FaPowerOff, FaMap, FaLeaf, 
+  FaChartLine, FaWater, FaTools, FaCloudSun } from 'react-icons/fa';
+import { Box, useTheme, FormControl, InputLabel, MenuItem, Select, Typography, 
+  Alert, Snackbar } from '@mui/material';
 
-
-import AdafruitData from './AdafruitData';
 import SensorChart from './SensorChart';
 import PumpControl from './PumpControl';
 import WeatherForecast from './WeatherForecast';
 import { getUserDevices, getDeviceAreaMapping } from '../../services/deviceService';
 import { getAreas } from '../../services/areaService';
-import { sendCommand, getLatestSensorData, getAdafruitFeedData } from '../../services/sensorService';
-
-
-// Thêm các styled components này sau phần import và trước khai báo component Dashboard
+import { sendCommand, getAdafruitFeedData, setActiveDevice } from '../../services/sensorService';
 
 // Styled components
 const Header = styled.div`
@@ -75,7 +68,6 @@ const CardValue = styled.div`
   color: ${props => props.theme.palette.primary.main};
 `;
 
-// Thêm styled components mới
 const DeviceSelector = styled.div`
   margin-bottom: 24px;
   padding: 16px;
@@ -135,88 +127,70 @@ const ValueText = styled.span`
   font-weight: 500;
 `;
 
-
 const Dashboard = () => {
   const muiTheme = useTheme();
-  const [pumpMode, setPumpMode] = useState('auto'); 
+  const [pumpMode, setPumpMode] = useState('auto');
   const [isPumpActive, setIsPumpActive] = useState(false);
-  
-  // State cho các tính năng mới
-  const [selectedZone, setSelectedZone] = useState(1);
-  const [thresholds, setThresholds] = useState({
-    soilMoisture: 55,
-    wateringDuration: 15
-  });
-  const [selectedArea, setSelectedArea] = useState(null);
-  const [irrigationMode, setIrrigationMode] = useState('balanced');
-  const [maintenanceNeeded, setMaintenanceNeeded] = useState(true);
-  const [isListening, setIsListening] = useState(false);
-  
-  // State mới cho chức năng chọn thiết bị và thiết lập ngưỡng độ ẩm
   const [devices, setDevices] = useState([]);
   const [areas, setAreas] = useState([]);
-  const [selectedDevice, setSelectedDevice] = useState('');
+  const [selectedPlant, setSelectedPlant] = useState(''); // Thay selectedDevice bằng selectedPlant
   const [deviceAreaMap, setDeviceAreaMap] = useState({});
   const [moistureThreshold, setMoistureThreshold] = useState(60);
   const [moistureMaxThreshold, setMoistureMaxThreshold] = useState(80);
   const [isAutoMode, setIsAutoMode] = useState(false);
   const [currentSoilMoisture, setCurrentSoilMoisture] = useState(0);
   const [isThresholdActive, setIsThresholdActive] = useState(false);
-
   const [sensorValues, setSensorValues] = useState({
     temp: '--',
     humidity: '--',
     soil: '--'
   });
-  
-  useEffect(() => {
-    const updateSensorValues = async () => {
-      try {
-        const [temp, humidity, soil] = await Promise.all([
-          getAdafruitFeedData('sensor-temp'),
-          getAdafruitFeedData('sensor-humidity'),
-          getAdafruitFeedData('sensor-soil')
-        ]);
-        
-        setSensorValues({
-          temp: temp !== null ? temp : '--',
-          humidity: humidity !== null ? humidity : '--',
-          soil: soil !== null ? soil : '--'
-        });
-      } catch (error) {
-        console.error('Error fetching sensor values:', error);
-      }
-    };
-    
-    updateSensorValues();
-    const intervalId = setInterval(updateSensorValues, 10000);
-    return () => clearInterval(intervalId);
-  }, []);
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
+  const [plantList, setPlantList] = useState([]); // Danh sách cây trồng kèm khu vực
 
-  // Load devices, areas, and device-area mappings
+  // Lấy thông tin khu vực và cây trồng
+  const getDeviceAreaAndPlant = () => {
+    if (!selectedPlant || !plantList.length) {
+      return { areaName: '', plantName: '', moistureNeeded: 0, moistureMaxThreshold: 0, deviceId: '' };
+    }
+    
+    const selected = plantList.find(p => `${p.areaId}_${p.plantIndex}` === selectedPlant);
+    if (!selected) {
+      return { areaName: '', plantName: '', moistureNeeded: 0, moistureMaxThreshold: 0, deviceId: '' };
+    }
+
+    const area = areas.find(a => a._id === selected.areaId);
+    const plant = area?.plants?.[selected.plantIndex];
+    
+    return {
+      areaName: area?.name || '',
+      plantName: plant?.name || '',
+      moistureNeeded: plant?.moistureThreshold?.min || 60,
+      moistureMaxThreshold: plant?.moistureThreshold?.max || 80,
+      deviceId: selected.deviceId || ''
+    };
+  };
+
+  const deviceInfo = useMemo(() => getDeviceAreaAndPlant(), [selectedPlant, plantList, areas]);
+  const selectedDeviceInfo = useMemo(() => devices.find(d => d.deviceId === deviceInfo.deviceId), [devices, deviceInfo.deviceId]);
+
+  // Load devices, areas, mappings, and build plant list
   useEffect(() => {
     const fetchDevicesAndAreas = async () => {
       try {
-        // Fetch devices
         const devicesResponse = await getUserDevices();
         if (devicesResponse.success) {
+          console.log('Fetched devices:', devicesResponse.devices);
           setDevices(devicesResponse.devices);
-          // Tự động chọn thiết bị đầu tiên nếu có
-          if (devicesResponse.devices.length > 0) {
-            setSelectedDevice(devicesResponse.devices[0].deviceId);
-          }
         }
-        
-        // Fetch areas
+
         const areasResponse = await getAreas();
         if (areasResponse.success) {
           setAreas(areasResponse.areas);
         }
-        
-        // Fetch device-area mappings
+
         const mappingsResponse = await getDeviceAreaMapping();
         if (mappingsResponse.success) {
-          // Tạo map từ deviceId -> { areaId, plantIndex }
           const mapping = {};
           mappingsResponse.mappings.forEach(item => {
             mapping[item.deviceId] = {
@@ -225,208 +199,189 @@ const Dashboard = () => {
             };
           });
           setDeviceAreaMap(mapping);
+
+          // Xây dựng danh sách cây trồng
+          const plants = [];
+          mappingsResponse.mappings.forEach(item => {
+            if (item.plantIndex >= 0) {
+              const area = areasResponse.areas.find(a => a._id === item.areaId);
+              if (area && area.plants && area.plants[item.plantIndex]) {
+                plants.push({
+                  areaId: item.areaId,
+                  areaName: area.name,
+                  plantIndex: item.plantIndex,
+                  plantName: area.plants[item.plantIndex].name,
+                  deviceId: item.deviceId
+                });
+              }
+            }
+          });
+          setPlantList(plants);
+          if (plants.length > 0) {
+            setSelectedPlant(`${plants[0].areaId}_${plants[0].plantIndex}`);
+          }
         }
       } catch (error) {
         console.error('Error fetching devices and areas:', error);
+        setSnackbar({ open: true, message: 'Lỗi khi tải danh sách thiết bị và khu vực', severity: 'error' });
       }
     };
-    
+
     fetchDevicesAndAreas();
   }, []);
-  
-  // Cập nhật giá trị độ ẩm đất hiện tại từ sensor
+
+  // Cập nhật dữ liệu cảm biến
   useEffect(() => {
-    const updateCurrentMoisture = async () => {
+    if (!deviceInfo.deviceId) return;
+
+    const updateSensorValues = async () => {
       try {
-        // Sử dụng service với deviceId
-        const soilMoistureValue = await getAdafruitFeedData('sensor-soil', selectedDevice);
-        if (soilMoistureValue !== null) {
-          setCurrentSoilMoisture(parseInt(soilMoistureValue, 10));
+        const [temp, humidity, soil] = await Promise.all([
+          getAdafruitFeedData('sensor-temp', deviceInfo.deviceId),
+          getAdafruitFeedData('sensor-humidity', deviceInfo.deviceId),
+          getAdafruitFeedData('sensor-soil', deviceInfo.deviceId)
+        ]);
+
+        setSensorValues({
+          temp: temp !== null ? temp : '--',
+          humidity: humidity !== null ? humidity : '--',
+          soil: soil !== null ? soil : '--'
+        });
+
+        if (soil !== null) {
+          setCurrentSoilMoisture(parseInt(soil, 10));
         }
+
+        const pumpStatus = await getAdafruitFeedData('pump-motor', deviceInfo.deviceId);
+        setIsPumpActive(pumpStatus === '1');
+        setSnackbar({ open: false, message: '', severity: 'info' });
       } catch (error) {
-        console.error(`Error updating current moisture for device ${selectedDevice}:`, error);
+        console.error(`Error fetching sensor values for device ${deviceInfo.deviceId}:`, error);
+        setSnackbar({ open: true, message: `Lỗi khi lấy dữ liệu cho thiết bị ${deviceInfo.deviceId}`, severity: 'error' });
       }
     };
-    
-    if (selectedDevice) {
-      updateCurrentMoisture();
-      const intervalId = setInterval(updateCurrentMoisture, 10000);
-      return () => clearInterval(intervalId);
-    }
-  }, [selectedDevice]);
-  
-  // Logic để tự động điều khiển máy bơm dựa trên ngưỡng độ ẩm
-  useEffect(() => {
-    const autoControlPump = async () => {
-      if (isAutoMode && isThresholdActive) {
-        try {
-          if (currentSoilMoisture < moistureThreshold) {
-            // Độ ẩm dưới ngưỡng -> bật bơm
-            await sendCommand('pump-motor', 1);
-            setIsPumpActive(true);
-          } else {
-            // Độ ẩm đạt ngưỡng -> tắt bơm
-            await sendCommand('pump-motor', 0);
-            setIsPumpActive(false);
-          }
-        } catch (error) {
-          console.error('Error auto controlling pump:', error);
-        }
-      }
-    };
-    
-    autoControlPump();
-  }, [isAutoMode, isThresholdActive, currentSoilMoisture, moistureThreshold]);
 
-  useEffect(() => {
-    if (selectedDevice) {
-      console.log(`Đang tải dữ liệu cho thiết bị: ${selectedDevice}`);
-      
-      // Cập nhật dữ liệu cảm biến cho thiết bị đã chọn
-      const updateDeviceSensors = async () => {
-        try {
-          const [temp, humidity, soil] = await Promise.all([
-            getAdafruitFeedData('sensor-temp', selectedDevice),
-            getAdafruitFeedData('sensor-humidity', selectedDevice),
-            getAdafruitFeedData('sensor-soil', selectedDevice)
-          ]);
-          
-          setSensorValues({
-            temp: temp !== null ? temp : '--',
-            humidity: humidity !== null ? humidity : '--',
-            soil: soil !== null ? soil : '--'
-          });
-          
-          // Cập nhật độ ẩm đất hiện tại
-          if (soil !== null) {
-            setCurrentSoilMoisture(parseInt(soil, 10));
-          }
-        } catch (error) {
-          console.error(`Lỗi khi cập nhật dữ liệu cảm biến cho thiết bị ${selectedDevice}:`, error);
-        }
-      };
-      
-      updateDeviceSensors();
-    }
-  }, [selectedDevice]);
+    updateSensorValues();
+    const intervalId = setInterval(updateSensorValues, 10000);
+    return () => clearInterval(intervalId);
+  }, [deviceInfo.deviceId]);
 
-  // Hàm xử lý thay đổi thiết bị
-  const handleDeviceChange = (event) => {
-    setSelectedDevice(event.target.value);
-  };
-  
-  // Hàm áp dụng ngưỡng độ ẩm
-  const applyMoistureThreshold = async () => {
+  // Handle plant change
+  const handlePlantChange = async (event) => {
+    const newPlantKey = event.target.value;
+    console.log('Selected plant:', newPlantKey);
+
+    const selected = plantList.find(p => `${p.areaId}_${p.plantIndex}` === newPlantKey);
+    if (!selected) {
+      setSnackbar({ open: true, message: 'Cây trồng không hợp lệ', severity: 'error' });
+      return;
+    }
+
     try {
-      // Chuyển sang chế độ tự động với deviceId
-      await sendCommand('mode', 0, selectedDevice);
-      setIsAutoMode(true);
-      setIsThresholdActive(true);
-      
-      // Kiểm tra độ ẩm hiện tại và điều khiển bơm
-      if (currentSoilMoisture < moistureThreshold) {
-        await sendCommand('pump-motor', 1, selectedDevice);
-        setIsPumpActive(true);
+      const result = await setActiveDevice(selected.deviceId);
+      console.log('setActiveDevice response:', result);
+      if (result.success) {
+        setSelectedPlant(newPlantKey);
+        setSnackbar({ open: true, message: `Đã chọn cây ${selected.plantName} - ${selected.areaName}`, severity: 'success' });
       } else {
-        await sendCommand('pump-motor', 0, selectedDevice);
-        setIsPumpActive(false);
+        setSnackbar({ open: true, message: `Lỗi khi chọn thiết bị ${selected.deviceId}: ${result.message}`, severity: 'error' });
       }
     } catch (error) {
-      console.error(`Error applying moisture threshold for device ${selectedDevice}:`, error);
+      console.error('Error setting active device:', error);
+      setSnackbar({ open: true, message: `Lỗi khi chọn thiết bị ${selected.deviceId}`, severity: 'error' });
     }
   };
-  
-  // Hàm tắt ngưỡng độ ẩm
+
+  // Apply moisture threshold
+  const applyMoistureThreshold = async () => {
+    try {
+      await sendCommand('mode', 0, deviceInfo.deviceId);
+      setIsAutoMode(true);
+      setIsThresholdActive(true);
+
+      if (currentSoilMoisture < moistureThreshold) {
+        //await sendCommand('pump-motor', 1, deviceInfo.deviceId);
+        setIsPumpActive(true);
+      } else {
+        //await sendCommand('pump-motor', 0, deviceInfo.deviceId);
+        setIsPumpActive(false);
+      }
+      setSnackbar({ open: true, message: 'Đã áp dụng ngưỡng độ ẩm', severity: 'success' });
+    } catch (error) {
+      console.error(`Error applying moisture threshold for device ${deviceInfo.deviceId}:`, error);
+      setSnackbar({ open: true, message: `Lỗi khi áp dụng ngưỡng độ ẩm cho thiết bị ${deviceInfo.deviceId}`, severity: 'error' });
+    }
+  };
+
+  // Disable moisture threshold
   const disableMoistureThreshold = async () => {
     try {
       setIsThresholdActive(false);
-      // Tắt máy bơm khi tắt chế độ tự động
-      await sendCommand('pump-motor', 0, selectedDevice);
+      //await sendCommand('pump-motor', 0, deviceInfo.deviceId);
       setIsPumpActive(false);
+      setSnackbar({ open: true, message: 'Đã tắt ngưỡng độ ẩm', severity: 'success' });
     } catch (error) {
-      console.error(`Error disabling moisture threshold for device ${selectedDevice}:`, error);
+      console.error(`Error disabling moisture threshold for device ${deviceInfo.deviceId}:`, error);
+      setSnackbar({ open: true, message: `Lỗi khi tắt ngưỡng độ ẩm cho thiết bị ${deviceInfo.deviceId}`, severity: 'error' });
     }
   };
-  
-  // Lấy thông tin khu vực và cây trồng của thiết bị được chọn
-  const getDeviceAreaAndPlant = () => {
-    if (!selectedDevice || !deviceAreaMap[selectedDevice]) {
-      return { areaName: '', plantName: '', moistureNeeded: 0 };
-    }
-    
-    const mapping = deviceAreaMap[selectedDevice];
-    const area = areas.find(a => a._id === mapping.areaId);
-    
-    if (!area) {
-      return { areaName: '', plantName: '', moistureNeeded: 0 };
-    }
-    
-    let plantName = '';
-    let moistureNeeded = 0;
-    let moistureMaxThreshold = 0;
-    
-    if (mapping.plantIndex >= 0 && area.plants && area.plants[mapping.plantIndex]) {
-      plantName = area.plants[mapping.plantIndex].name;
-      moistureNeeded = area.plants[mapping.plantIndex].moistureThreshold.min || 60;
-      moistureMaxThreshold = area.plants[mapping.plantIndex].moistureThreshold.max || 80; 
-    }
-    
-    return {
-      areaName: area.name,
-      plantName,
-      moistureNeeded,
-      moistureMaxThreshold
-    };
-  };
-  
-  // Thông tin thiết bị, khu vực và cây trồng
-  const deviceInfo = getDeviceAreaAndPlant();
-  const selectedDeviceInfo = devices.find(d => d.deviceId === selectedDevice);
 
   return (
     <Box>
       <Header theme={muiTheme}>
         <HeaderTitle theme={muiTheme}>Bảng Điều Khiển</HeaderTitle>
       </Header>
-      
-      {/* Phần chọn thiết bị và hiển thị thông tin */}
+
+      {/* Snackbar thông báo */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+      >
+        <Alert severity={snackbar.severity} sx={{ width: '100%' }}>
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
+
+      {/* Plant Selector */}
       <DeviceSelector theme={muiTheme}>
         <SectionTitle theme={muiTheme}>
-          <FaTools /> Chọn thiết bị giám sát
+          <FaLeaf /> Chọn cây trồng để giám sát
         </SectionTitle>
         
         <FormControl fullWidth variant="outlined" size="small">
-          <InputLabel>Thiết bị</InputLabel>
+          <InputLabel>Cây trồng</InputLabel>
           <Select
-            value={selectedDevice}
-            onChange={handleDeviceChange}
-            label="Thiết bị"
+            value={selectedPlant}
+            onChange={handlePlantChange}
+            label="Cây trồng"
           >
-            {devices.map(device => (
-              <MenuItem key={device.deviceId} value={device.deviceId}>
-                {device.deviceName}
+            {plantList.map(plant => (
+              <MenuItem 
+                key={`${plant.areaId}_${plant.plantIndex}`} 
+                value={`${plant.areaId}_${plant.plantIndex}`}
+              >
+                {plant.plantName} - {plant.areaName} ({plant.deviceId})
               </MenuItem>
             ))}
           </Select>
         </FormControl>
         
-        {selectedDevice && (
+        {selectedPlant && (
           <DeviceInfo theme={muiTheme}>
             <InfoRow theme={muiTheme}>
-              <LabelText theme={muiTheme}>Trạng thái:</LabelText>
+              <LabelText theme={muiTheme}>Thiết bị:</LabelText>
               <ValueText theme={muiTheme}>
-                {selectedDeviceInfo?.isActive ? 'Đang hoạt động' : 'Không hoạt động'}
+                {deviceInfo.deviceId} {selectedDeviceInfo?.isActive ? '(Đang theo dõi)' : '(Không hoạt động)'}
               </ValueText>
             </InfoRow>
             
             {deviceInfo.areaName && (
-              <>
-                <InfoRow theme={muiTheme}>
-                  <FaMap />
-                  <LabelText theme={muiTheme}>Khu vực:</LabelText>
-                  <ValueText theme={muiTheme}>{deviceInfo.areaName}</ValueText>
-                </InfoRow>
-              </>
+              <InfoRow theme={muiTheme}>
+                <FaMap />
+                <LabelText theme={muiTheme}>Khu vực:</LabelText>
+                <ValueText theme={muiTheme}>{deviceInfo.areaName}</ValueText>
+              </InfoRow>
             )}
             
             {deviceInfo.plantName && (
@@ -449,7 +404,7 @@ const Dashboard = () => {
           </DeviceInfo>
         )}
       </DeviceSelector>
-      
+
       {/* Quick Stats */}
       <Grid>
         <Card theme={muiTheme}>
@@ -464,7 +419,7 @@ const Dashboard = () => {
         <Card theme={muiTheme}>
           <CardHeader theme={muiTheme}>
             <CardTitle theme={muiTheme}><FaTint /> Độ ẩm không khí</CardTitle>
-          </CardHeader>            
+          </CardHeader>
           <CardValue theme={muiTheme}>
             {sensorValues.humidity}%
           </CardValue>
@@ -479,19 +434,19 @@ const Dashboard = () => {
           </CardValue>
         </Card>
       </Grid>
-      
+
       {/* Main Content */}
       <Grid>
-        {/* Sensor Monitoring */}
         <LargeCard theme={muiTheme}>
           <CardHeader theme={muiTheme}>
-            <CardTitle theme={muiTheme}>Biểu đồ cảm biến</CardTitle>
+            <CardTitle theme={muiTheme}>
+              <FaChartLine /> Biểu đồ cảm biến {deviceInfo.deviceId ? `- ${deviceInfo.deviceId}` : ''}
+            </CardTitle>
           </CardHeader>
-          <SensorChart />
+          <SensorChart selectedDevice={deviceInfo.deviceId} />
         </LargeCard>
-        
-        {/* Pump Control */}
-        <Card theme={muiTheme}>
+
+        <LargeCard theme={muiTheme}>
           <CardHeader theme={muiTheme}>
             <CardTitle theme={muiTheme}>
               <FaPowerOff /> Điều khiển bơm
@@ -505,19 +460,16 @@ const Dashboard = () => {
             currentSoilMoisture={currentSoilMoisture}
             areas={areas}
             deviceAreaMap={deviceAreaMap}
-            selectedDevice={selectedDevice}
+            selectedDevice={deviceInfo.deviceId}
           />
-        </Card>
-        
-        {/* Weather Forecast - Dự báo thời tiết */}
-        <Card theme={muiTheme}>
+        </LargeCard>
+
+        <LargeCard theme={muiTheme}>
           <CardHeader theme={muiTheme}>
             <CardTitle theme={muiTheme}><FaCloudSun /> Dự báo thời tiết</CardTitle>
           </CardHeader>
           <WeatherForecast />
-        </Card>
-        
-        {/* Các phần hiển thị khác có thể giữ nguyên */}
+        </LargeCard>
       </Grid>
     </Box>
   );

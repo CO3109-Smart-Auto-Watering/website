@@ -44,38 +44,54 @@ export const getLatestSensorData = async (deviceId = null) => {
   }
 };
 
-// Get historical data for a specific feed
 export const getHistoricalData = async (feedName, limit = 24, deviceId = null) => {
-  const token = localStorage.getItem('token');
   try {
-    const endpoint = deviceId
-      ? `${API_URL}/sensor-data/${deviceId}/history/${feedName}?limit=${limit}`
-      : `${API_URL}/sensor-data/history/${feedName}?limit=${limit}`;
+    const token = localStorage.getItem('token');
+    
+    // Xây dựng endpoint dựa trên deviceId
+    let endpoint = deviceId 
+      ? `${API_URL}/sensor-data/${deviceId}/history/${feedName}` 
+      : `${API_URL}/sensor-data/history/${feedName}`;
+    
+    // Thêm limit vào query params
+    endpoint += `?limit=${limit}`;
     
     const response = await axios.get(endpoint, {
       headers: {
         'x-auth-token': token
       }
     });
+    
     return response.data;
   } catch (error) {
-    console.error(`Error fetching historical data for ${feedName}${deviceId ? ' of device '+deviceId : ''}:`, error);
+    console.error(`Error fetching historical data for ${feedName}:`, error);
     throw error;
-  } 
+  }
 };
 
 // Send command to Adafruit (e.g., control pump, set mode)
-export const sendCommand = async (feedName, value) => {
+export const sendCommand = async (feedName, value, deviceId = null) => {
   try {
     const token = localStorage.getItem('token');
     
-    // Sử dụng axios trực tiếp thay vì api instance để đảm bảo token được gửi
+    // Sử dụng endpoint khác nhau dựa trên deviceId
+    const endpoint = deviceId
+      ? `${API_URL}/sensor-data/${deviceId}/command`
+      : `${API_URL}/sensor-data/command`;
+    
+    // Cấu trúc request body theo endpoint
+    const payload = {
+      feedName,
+      value
+    };
+    
+    if (deviceId) {
+      payload.deviceId = deviceId;
+    }
+    
     const response = await axios.post(
-      `${API_URL}/sensor-data/command`,
-      {
-        feedName,
-        value
-      },
+      endpoint,
+      payload,
       {
         headers: {
           'Content-Type': 'application/json',
@@ -86,21 +102,11 @@ export const sendCommand = async (feedName, value) => {
     
     return response.data;
   } catch (error) {
-    console.error(`Error sending command to ${feedName}:`, error);
+    console.error(`Error sending command to ${feedName}${deviceId ? ' for device '+deviceId : ''}:`, error);
     throw error;
   }
 };
 
-// Set irrigation schedule
-export const setSchedule = async (scheduleData) => {
-  try {
-    const response = await api.post('/schedules', scheduleData);
-    return response.data;
-  } catch (error) {
-    console.error('Error setting schedule:', error);
-    throw error;
-  }
-};
 
 export const getAdafruitFeedData = async (feedName, deviceId = null) => {
   try {
@@ -131,12 +137,35 @@ export const getAdafruitFeedData = async (feedName, deviceId = null) => {
   }
 };
 
+export const setActiveDevice = async (deviceId) => {
+  try {
+    const token = localStorage.getItem('token');
+    
+    const response = await axios.post(
+      `${API_URL}/sensor-data/set-active-device`,
+      { deviceId },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'x-auth-token': token
+        }
+      }
+    );
+    
+    return response.data;
+  } catch (error) {
+    console.error(`Error setting active device ${deviceId}:`, error);
+    throw error;
+  }
+};
+
 
 const sensorService = {
   getLatestSensorData,
   sendCommand,
-  setSchedule,
   getAdafruitFeedData,
+  setActiveDevice,
+  getHistoricalData
 };
 
 export default sensorService;

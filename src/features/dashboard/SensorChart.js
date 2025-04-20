@@ -50,7 +50,7 @@ const CustomTooltip = ({ active, payload, label }) => {
   return null;
 };
 
-const SensorChart = () => {
+const SensorChart = ({ selectedDevice }) => {
   const theme = useTheme();
   const [period, setPeriod] = useState('6h');
   const [sensorType, setSensorType] = useState('all');
@@ -60,43 +60,84 @@ const SensorChart = () => {
   
   useEffect(() => {
     const fetchData = async () => {
+      if (!selectedDevice) {
+        console.log('No selected device provided');
+        setData([]);
+        setError('Vui lòng chọn một thiết bị để hiển thị dữ liệu.');
+        setLoading(false);
+        return;
+      }
+  
       setLoading(true);
       setError(null);
-      
+  
       try {
-        // Xác định limit dựa trên period
         let limit;
         switch (period) {
-          case '6h': limit = 24; break;  // 15 phút/mẫu trong 6 giờ
-          case '24h': limit = 48; break; // 30 phút/mẫu trong 24 giờ
-          case '7d': limit = 84; break;  // 2 giờ/mẫu trong 7 ngày
-          case '30d': limit = 120; break; // 6 giờ/mẫu trong 30 ngày
-          default: limit = 24;
+          case '6h':
+            limit = 24;
+            break;
+          case '24h':
+            limit = 48;
+            break;
+          case '7d':
+            limit = 84;
+            break;
+          case '30d':
+            limit = 120;
+            break;
+          default:
+            limit = 24;
         }
-        
-        // Fetch dữ liệu từ các cảm biến cần thiết
+  
+        console.log('Fetching data for:', { feedNames: ['sensor-temp', 'sensor-humidity', 'sensor-soil'], limit, deviceId: selectedDevice });
+  
         const [tempData, humidityData, soilData] = await Promise.all([
-          getHistoricalData('sensor-temp', limit),
-          getHistoricalData('sensor-humidity', limit),
-          getHistoricalData('sensor-soil', limit)
+          getHistoricalData('sensor-temp', limit, selectedDevice).catch(err => {
+            console.error('Error fetching sensor-temp:', err.response?.data || err.message);
+            return { success: false, data: [] };
+          }),
+          getHistoricalData('sensor-humidity', limit, selectedDevice).catch(err => {
+            console.error('Error fetching sensor-humidity:', err.response?.data || err.message);
+            return { success: false, data: [] };
+          }),
+          getHistoricalData('sensor-soil', limit, selectedDevice).catch(err => {
+            console.error('Error fetching sensor-soil:', err.response?.data || err.message);
+            return { success: false, data: [] };
+          })
         ]);
-        
-        // Xử lý và kết hợp dữ liệu
+  
+        console.log('Fetched data:', { tempData, humidityData, soilData });
+  
+        if (!tempData.success && !humidityData.success && !soilData.success) {
+          setError(tempData.data?.message || 'Thiết bị không tồn tại hoặc bạn không có quyền truy cập.');
+          setData([]);
+          setLoading(false);
+          return;
+        }
+  
         const combinedData = processData(tempData, humidityData, soilData);
-        
-        // Đảm bảo dữ liệu được sắp xếp theo thời gian tăng dần (trái sang phải)
+        console.log('Processed data:', combinedData);
+  
         setData(combinedData.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)));
-        
       } catch (err) {
-        console.error('Error fetching sensor data:', err);
-        setError('Không thể tải dữ liệu. Vui lòng thử lại sau.');
+        console.error('Unexpected error fetching sensor data:', err);
+        setError(err.response?.status === 403 
+          ? 'Thiết bị không hợp lệ hoặc bạn không có quyền truy cập.' 
+          : 'Không thể tải dữ liệu. Vui lòng thử lại sau.');
       } finally {
         setLoading(false);
       }
     };
-    
+  
     fetchData();
-  }, [period]);
+  
+    // Polling: Gọi lại fetchData mỗi 10 giây
+    const intervalId = setInterval(fetchData, 10000);
+  
+    // Cleanup interval khi component unmount hoặc dependencies thay đổi
+    return () => clearInterval(intervalId);
+  }, [period, selectedDevice]);
   
   // Hàm xử lý và kết hợp dữ liệu từ các cảm biến
   const processData = (tempData, humidityData, soilData) => {

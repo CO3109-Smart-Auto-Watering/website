@@ -16,7 +16,7 @@ import {
   ArrowUpward, ArrowDownward, Settings, Wifi, WifiOff, Warning,
   CheckCircle, Error, SensorDoor, Thermostat, Opacity, WaterDrop,
   RoomPreferences, LightMode, Grass, LocalFlorist, ViewList, Clear,
-  FilterAlt, Dashboard, TuneSharp, AreaChart, Sync
+  FilterAlt, Dashboard, TuneSharp, AreaChart, Sync, PowerSettingsNew
 } from '@mui/icons-material';
 import { getUserDevices, registerDevice, updateDevice, deleteDevice, toggleDeviceStatus, synchronizeDeviceArea } from '../../services/deviceService';
 import { getAreas } from '../../services/areaService';
@@ -1141,7 +1141,7 @@ const DeviceManager = () => {
                                   color={device.isActive ? 'success' : 'default'}
                                   sx={{ mr: 0.5 }}
                                 >
-                                  <Settings />
+                                  <PowerSettingsNew />
                                 </IconButton>
                               </Tooltip>
 
@@ -1360,7 +1360,7 @@ const DeviceManager = () => {
                           color={device.isActive ? 'success' : 'default'}
                           sx={{ mr: 0.5 }}
                         >
-                          <Settings />
+                          <PowerSettingsNew />
                         </IconButton>
                       </Tooltip>
 
@@ -1536,7 +1536,7 @@ const DeviceManager = () => {
                             onClick={() => handleToggleStatus(device.deviceId)}
                             color={device.isActive ? 'success' : 'default'}
                           >
-                            <Settings />
+                            <PowerSettingsNew />
                           </IconButton>
                         </Tooltip>
                         <Tooltip title="Chỉnh sửa">
