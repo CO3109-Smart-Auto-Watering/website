@@ -1,18 +1,21 @@
 import React, { useState, useEffect, useRef } from 'react';
+import axios from 'axios';
 import styled from 'styled-components';
 import { useTheme } from '@mui/material';
-import { 
+import {
   LineChart, Line, BarChart, Bar, PieChart, Pie, AreaChart, Area,
-  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
+  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
-import { 
-  FaChartLine, FaChartBar, FaChartPie, FaCalendarAlt, FaDownload, 
-  FaFilter, FaTable, FaPrint, FaSyncAlt, FaListUl, FaInfoCircle 
+import {
+  FaChartLine, FaChartBar, FaChartPie, FaCalendarAlt, FaDownload,
+  FaFilter, FaTable, FaPrint, FaSyncAlt, FaListUl, FaInfoCircle
 } from 'react-icons/fa';
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
 import { TbPlant, TbDroplet, TbSun, TbWind } from 'react-icons/tb';
+import { getUserDevices } from '../../services/deviceService';
 
+const baseURL = process.env.REACT_APP_API_URL
 // Styled components với hỗ trợ theme sáng/tối
 const ReportContainer = styled.div`
   padding: 20px 0;
@@ -75,11 +78,11 @@ const Tab = styled.button`
   padding: 10px 16px;
   border-radius: 8px;
   border: none;
-  background: ${props => props.$active 
-    ? `${props.theme.palette.primary.main}20` 
+  background: ${props => props.$active
+    ? `${props.theme.palette.primary.main}20`
     : 'transparent'};
-  color: ${props => props.$active 
-    ? props.theme.palette.primary.main 
+  color: ${props => props.$active
+    ? props.theme.palette.primary.main
     : props.theme.palette.text.primary};
   font-weight: ${props => props.$active ? 600 : 400};
   cursor: pointer;
@@ -88,9 +91,9 @@ const Tab = styled.button`
   gap: 8px;
   
   &:hover {
-    background: ${props => props.$active 
-      ? `${props.theme.palette.primary.main}30` 
-      : props.theme.palette.action.hover};
+    background: ${props => props.$active
+    ? `${props.theme.palette.primary.main}30`
+    : props.theme.palette.action.hover};
   }
 `;
 
@@ -105,8 +108,8 @@ const Card = styled.div`
   background: ${props => props.theme.palette.background.paper};
   border-radius: 12px;
   padding: 24px;
-  box-shadow: ${props => props.theme.palette.mode === 'dark' 
-    ? '0 4px 12px rgba(0, 0, 0, 0.2)' 
+  box-shadow: ${props => props.theme.palette.mode === 'dark'
+    ? '0 4px 12px rgba(0, 0, 0, 0.2)'
     : '0 4px 12px rgba(0, 0, 0, 0.05)'};
   transition: background-color 0.3s ease, box-shadow 0.3s ease;
 `;
@@ -211,16 +214,16 @@ const Button = styled.button`
   align-items: center;
   gap: 8px;
   padding: 10px 16px;
-  background: ${props => props.$primary 
-    ? props.theme.palette.primary.main 
+  background: ${props => props.$primary
+    ? props.theme.palette.primary.main
     : props.theme.palette.mode === 'dark'
       ? props.theme.palette.background.default
       : '#f5f5f5'};
-  color: ${props => props.$primary 
-    ? '#fff' 
+  color: ${props => props.$primary
+    ? '#fff'
     : props.theme.palette.text.primary};
-  border: 1px solid ${props => props.$primary 
-    ? props.theme.palette.primary.main 
+  border: 1px solid ${props => props.$primary
+    ? props.theme.palette.primary.main
     : props.theme.palette.divider};
   border-radius: 8px;
   font-weight: 500;
@@ -228,9 +231,9 @@ const Button = styled.button`
   transition: all 0.2s;
   
   &:hover {
-    background: ${props => props.$primary 
-      ? props.theme.palette.primary.dark 
-      : props.theme.palette.action.hover};
+    background: ${props => props.$primary
+    ? props.theme.palette.primary.dark
+    : props.theme.palette.action.hover};
   }
 `;
 
@@ -283,51 +286,206 @@ const ReportsAnalytics = () => {
   const [dateRange, setDateRange] = useState('7days');
   const [zoneFilter, setZoneFilter] = useState('all');
   const chartRef = useRef(null);
-  
+  const [isLoading, setIsLoading] = useState(true);
+  const [devices, setDevices] = useState([]);
+  const [loadMode, setLoadMode] = useState({ modeLoading: true, results: [] });
+
+
   // Hàm xử lý xuất báo cáo PDF
   const exportPDF = () => {
     const doc = new jsPDF();
     doc.text("Báo cáo hệ thống tưới tự động", 14, 16);
     doc.text("Thời gian: 7 ngày gần nhất", 14, 24);
-    
+
     // Bảng lịch sử tưới
     doc.autoTable({
       head: [['Ngày', 'Giờ', 'Khu vực', 'Thời lượng', 'Loại', 'Lý do']],
       body: wateringLogs.map(log => [
-        log.date, 
-        log.time, 
-        log.zone, 
-        log.duration, 
-        log.type, 
+        log.date,
+        log.time,
+        log.zone,
+        log.duration,
+        log.type,
         log.reason
       ]),
       startY: 35,
     });
-    
+
     // Lưu file
     doc.save("bao-cao-he-thong-tuoi.pdf");
   };
-  
+
   // Hàm in báo cáo
   const printReport = () => {
     window.print();
   };
-  
+
   // Hàm tổng hợp nước đã sử dụng
   const getTotalWaterUsage = () => {
     return waterConsumptionData.reduce((sum, item) => sum + item.amount, 0);
   };
-  
-  // Hàm đếm số lần tưới tự động
-  const getAutoWateringCount = () => {
-    return wateringData.reduce((sum, day) => sum + day.autoCount, 0);
+
+  const fetchDevices = async () => {
+    setIsLoading(true);
+    try {
+      const response = await getUserDevices();
+      if (response.success) {
+        console.log("Dữ liệu thiết bị nhận về:", response.devices);
+        setDevices(response.devices);
+        // setFilteredDevices(response.devices);
+      } else {
+        // setSnackbar({
+        //   open: true,
+        //   message: 'Không thể tải danh sách thiết bị',
+        //   severity: 'error'
+        // });
+      }
+    } catch (error) {
+      console.error('Error fetching devices:', error);
+      // setSnackbar({
+      //   open: true,
+      //   message: error.response?.data?.message || 'Lỗi khi tải thiết bị',
+      //   severity: 'error'
+      // });
+    } finally {
+      setIsLoading(false);
+    }
   };
-  
-  // Hàm đếm số lần tưới thủ công
-  const getManualWateringCount = () => {
-    return wateringData.reduce((sum, day) => sum + day.manualCount, 0);
+
+  useEffect(() => {
+    fetchDevices();
+  }, []);
+
+  const [avgData, setAvgData] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const token = localStorage.getItem('token');
+  const [moistureData, setMoistureData] = useState([]);
+  const [modeData, setModeData] = useState([]);
+  const [modeState, setModeState] = useState({ modeLoading: true, results: [] });
+  const [dailyData, setDailyData] = useState([]);
+
+  // Fetch average data from API
+  useEffect(() => {
+    const fetchAverageData = async () => {
+      try {
+        setLoading(true);
+        const res = await axios.get(`${baseURL}/average`, {
+          headers: { 'x-auth-token': token },
+          params: { feedName: 'sensor-soil' }
+        });
+        setAvgData(res.data.results);
+      } catch (err) {
+        console.error('Lỗi khi lấy dữ liệu:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchAverageData();
+  }, [zoneFilter, dateRange, token]);
+
+  // Filter data based on selected zone
+  const filtered = zoneFilter === 'all'
+    ? avgData
+    : avgData.filter(device => device.deviceId === zoneFilter);
+
+  // Map data to display the average values
+  const displayData = filtered.map(device => {
+    const average = dateRange === '7days'
+      ? device.averages.last7DaysAvg
+      : device.averages.last30DaysAvg;
+    return {
+      deviceId: device.deviceId,
+      average,
+      daily: device.daily // contains { date, average }
+    };
+  });
+
+  // Merge daily averages across all devices for 'all'
+  const mergeDailyAverages = (devices) => {
+    const dailyMap = new Map();
+    devices.forEach(device => {
+      device.daily.forEach(entry => {
+        const { date, average } = entry;
+        // Filter by date range
+        const entryDate = new Date(date);
+        const now = new Date();
+        const diff = now - entryDate;
+        const limit = dateRange === '7days'
+          ? 7 * 24 * 60 * 60 * 1000
+          : 30 * 24 * 60 * 60 * 1000;
+        if (diff <= limit) {
+          if (!dailyMap.has(date)) dailyMap.set(date, []);
+          dailyMap.get(date).push(average);
+        }
+      });
+    });
+    return Array.from(dailyMap.entries())
+      .map(([date, values]) => ({
+        date,
+        average: Number((values.reduce((sum, v) => sum + v, 0) / values.length).toFixed(2))
+      }))
+      .sort((a, b) => new Date(a.date) - new Date(b.date));
   };
-  
+
+  // Update moistureData when filters change
+  useEffect(() => {
+    let data = [];
+    if (zoneFilter === 'all') {
+      data = mergeDailyAverages(displayData);
+    } else {
+      // specific device: filter its daily entries by dateRange
+      const device = displayData.find(d => d.deviceId === zoneFilter);
+      if (device) {
+        data = device.daily.filter(entry => {
+          const entryDate = new Date(entry.date);
+          const now = new Date();
+          const diff = now - entryDate;
+          const limit = dateRange === '7days'
+            ? 7 * 24 * 60 * 60 * 1000
+            : 30 * 24 * 60 * 60 * 1000;
+          return diff <= limit;
+        });
+      }
+    }
+    setMoistureData(data);
+    console.log("Moisture data:", data);
+  }, [zoneFilter, dateRange, avgData]);
+
+  // Calculate total average for 'all'
+  const totalAvg = zoneFilter === 'all' && displayData.length > 0
+    ? Number((displayData.reduce((sum, d) => sum + d.average, 0) / displayData.length).toFixed(1))
+    : null;
+
+  // Specific device average
+  const specificAvg = zoneFilter !== 'all' && displayData.length > 0
+    ? displayData[0].average
+    : null;
+
+
+  useEffect(() => {
+    const fetchModeData = async () => {
+      try {
+        // setLoading(true);
+        const endpoint = zoneFilter === 'all' ? '/mode/summary/cleaned' : '/mode/summary';
+        const res = await axios.get(`${baseURL}${endpoint}`, {
+          headers: { "x-auth-token": token },
+          params: zoneFilter === 'all' ? {} : { deviceId: zoneFilter },
+        });
+        setModeData({
+          autoMode: res.data.autoMode || 0,
+          manualMode: res.data.manualMode || 0,
+        });
+      } catch (err) {
+        console.error("Fetch mode summary error:", err);
+        setModeData({ autoMode: 0, manualMode: 0 });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchModeData();
+  }, [zoneFilter]);
+
   return (
     <ReportContainer>
       <Header>
@@ -341,25 +499,37 @@ const ReportsAnalytics = () => {
           </Button>
         </ButtonGroup>
       </Header>
-      
+
       <FilterContainer>
         <Filter>
           <FilterLabel theme={theme}>Thời gian:</FilterLabel>
-          <Select 
+          <Select
             value={dateRange}
             onChange={(e) => setDateRange(e.target.value)}
             theme={theme}
           >
             <option value="7days">7 ngày gần đây</option>
             <option value="30days">30 ngày gần đây</option>
-            <option value="3months">3 tháng gần đây</option>
-            <option value="custom">Tùy chỉnh...</option>
+            {/* <option value="3months">3 tháng gần đây</option>
+            <option value="custom">Tùy chỉnh...</option> */}
           </Select>
         </Filter>
-        
+
         <Filter>
-          <FilterLabel theme={theme}>Khu vực:</FilterLabel>
-          <Select 
+          <FilterLabel theme={theme}>Thiết bị:</FilterLabel>
+          <Select
+            value={zoneFilter}
+            onChange={(e) => setZoneFilter(e.target.value)}
+            theme={theme}
+          >
+            <option value="all">Tất cả thiết bị</option>
+            {devices.map((device) => (
+              <option key={device.deviceId} value={device.deviceId}>
+                {device.deviceId}
+              </option>
+            ))}
+          </Select>
+          {/* <Select
             value={zoneFilter}
             onChange={(e) => setZoneFilter(e.target.value)}
             theme={theme}
@@ -369,41 +539,41 @@ const ReportsAnalytics = () => {
             <option value="back">Vườn sau</option>
             <option value="vegetables">Khu rau</option>
             <option value="flowers">Khu hoa</option>
-          </Select>
+          </Select> */}
         </Filter>
       </FilterContainer>
-      
+
       <TabContainer theme={theme}>
-        <Tab 
-          $active={activeTab === 'overview'} 
+        <Tab
+          $active={activeTab === 'overview'}
           onClick={() => setActiveTab('overview')}
           theme={theme}
         >
           <FaChartLine /> Tổng quan
         </Tab>
-        <Tab 
-          $active={activeTab === 'watering'} 
+        <Tab
+          $active={activeTab === 'watering'}
           onClick={() => setActiveTab('watering')}
           theme={theme}
         >
           <FaChartBar /> Lịch sử tưới
         </Tab>
-        <Tab 
-          $active={activeTab === 'logs'} 
+        <Tab
+          $active={activeTab === 'logs'}
           onClick={() => setActiveTab('logs')}
           theme={theme}
         >
           <FaListUl /> Nhật ký chi tiết
         </Tab>
-        <Tab 
-          $active={activeTab === 'usage'} 
+        <Tab
+          $active={activeTab === 'usage'}
           onClick={() => setActiveTab('usage')}
           theme={theme}
         >
           <FaChartPie /> Tiêu thụ nước
         </Tab>
       </TabContainer>
-      
+
       {activeTab === 'overview' && (
         <>
           <SummaryGrid>
@@ -413,29 +583,42 @@ const ReportsAnalytics = () => {
                 <TbDroplet /> {getTotalWaterUsage()} lít
               </SummaryValue>
             </SummaryCard>
-            
+
             <SummaryCard theme={theme}>
               <SummaryTitle theme={theme}>Độ ẩm đất trung bình</SummaryTitle>
               <SummaryValue theme={theme}>
-                <TbPlant /> 63%
+                <TbPlant />
+                {loading ? (
+                  <div>...</div>
+                ) : zoneFilter === "all" ? (
+                  <div>{totalAvg}%</div>
+                ) : (
+                  displayData.map(device => (
+                    <div key={device.deviceId}>
+                      {/* <h3>Thiết bị: {device.deviceId}</h3> */}
+                      {device.average}%
+                      {/* render biểu đồ nếu cần từ device.daily */}
+                    </div>
+                  ))
+                )}
               </SummaryValue>
             </SummaryCard>
-            
+
             <SummaryCard theme={theme}>
               <SummaryTitle theme={theme}>Số lần tưới tự động</SummaryTitle>
               <SummaryValue theme={theme}>
-                <FaSyncAlt /> {getAutoWateringCount()} lần
+                <FaSyncAlt /> {loading ? "..." : `${modeData.autoMode} lần`}
               </SummaryValue>
             </SummaryCard>
-            
+
             <SummaryCard theme={theme}>
               <SummaryTitle theme={theme}>Số lần tưới thủ công</SummaryTitle>
               <SummaryValue theme={theme}>
-                <FaInfoCircle /> {getManualWateringCount()} lần
+                <FaInfoCircle /> {loading ? "..." : `${modeData.manualMode} lần`}
               </SummaryValue>
             </SummaryCard>
           </SummaryGrid>
-          
+
           <Grid>
             <LargeCard theme={theme} ref={chartRef}>
               <CardHeader theme={theme}>
@@ -444,25 +627,30 @@ const ReportsAnalytics = () => {
                 </CardTitle>
               </CardHeader>
               <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={moistureData}>
+                <LineChart
+                  data={moistureData}
+                >
                   <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />
                   <XAxis dataKey="date" stroke={theme.palette.text.secondary} />
                   <YAxis stroke={theme.palette.text.secondary} />
-                  <Tooltip 
+                  <Tooltip
                     contentStyle={{
                       backgroundColor: theme.palette.background.paper,
                       border: `1px solid ${theme.palette.divider}`,
                       color: theme.palette.text.primary
-                    }} 
+                    }}
                   />
-                  <Legend />
-                  <Line type="monotone" dataKey="morning" name="Sáng" stroke="#8884d8" activeDot={{ r: 8 }} />
-                  <Line type="monotone" dataKey="afternoon" name="Chiều" stroke="#82ca9d" />
-                  <Line type="monotone" dataKey="evening" name="Tối" stroke="#ffc658" />
+                  <Line
+                    type="monotone"
+                    dataKey="average" // Lấy giá trị độ ẩm trung bình
+                    name="Độ ẩm trung bình đất"
+                    stroke="#8884d8" // Chọn màu cho line
+                    activeDot={{ r: 8 }}
+                  />
                 </LineChart>
               </ResponsiveContainer>
             </LargeCard>
-            
+
             <Card theme={theme}>
               <CardHeader theme={theme}>
                 <CardTitle theme={theme}>
@@ -474,12 +662,12 @@ const ReportsAnalytics = () => {
                   <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />
                   <XAxis dataKey="date" stroke={theme.palette.text.secondary} />
                   <YAxis stroke={theme.palette.text.secondary} />
-                  <Tooltip 
+                  <Tooltip
                     contentStyle={{
                       backgroundColor: theme.palette.background.paper,
                       border: `1px solid ${theme.palette.divider}`,
                       color: theme.palette.text.primary
-                    }} 
+                    }}
                   />
                   <Legend />
                   <Bar dataKey="autoCount" name="Tự động" fill={theme.palette.primary.main} />
@@ -487,7 +675,7 @@ const ReportsAnalytics = () => {
                 </BarChart>
               </ResponsiveContainer>
             </Card>
-            
+
             <Card theme={theme}>
               <CardHeader theme={theme}>
                 <CardTitle theme={theme}>
@@ -506,12 +694,12 @@ const ReportsAnalytics = () => {
                     fill="#8884d8"
                     dataKey="value"
                   />
-                  <Tooltip 
+                  <Tooltip
                     contentStyle={{
                       backgroundColor: theme.palette.background.paper,
                       border: `1px solid ${theme.palette.divider}`,
                       color: theme.palette.text.primary
-                    }} 
+                    }}
                   />
                 </PieChart>
               </ResponsiveContainer>
@@ -519,7 +707,7 @@ const ReportsAnalytics = () => {
           </Grid>
         </>
       )}
-      
+
       {activeTab === 'logs' && (
         <Card theme={theme}>
           <CardHeader theme={theme}>
@@ -527,7 +715,7 @@ const ReportsAnalytics = () => {
               <FaListUl /> Nhật ký tưới chi tiết
             </CardTitle>
           </CardHeader>
-          
+
           <Table>
             <thead>
               <tr>
@@ -556,7 +744,7 @@ const ReportsAnalytics = () => {
           </Table>
         </Card>
       )}
-      
+
       {activeTab === 'watering' && (
         <LargeCard theme={theme}>
           <CardHeader theme={theme}>
@@ -569,7 +757,7 @@ const ReportsAnalytics = () => {
               <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />
               <XAxis dataKey="date" stroke={theme.palette.text.secondary} />
               <YAxis stroke={theme.palette.text.secondary} />
-              <Tooltip 
+              <Tooltip
                 contentStyle={{
                   backgroundColor: theme.palette.background.paper,
                   border: `1px solid ${theme.palette.divider}`,
@@ -583,7 +771,7 @@ const ReportsAnalytics = () => {
           </ResponsiveContainer>
         </LargeCard>
       )}
-      
+
       {activeTab === 'usage' && (
         <LargeCard theme={theme}>
           <CardHeader theme={theme}>
@@ -596,19 +784,19 @@ const ReportsAnalytics = () => {
               <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />
               <XAxis dataKey="month" stroke={theme.palette.text.secondary} />
               <YAxis stroke={theme.palette.text.secondary} />
-              <Tooltip 
+              <Tooltip
                 contentStyle={{
                   backgroundColor: theme.palette.background.paper,
                   border: `1px solid ${theme.palette.divider}`,
                   color: theme.palette.text.primary
                 }}
               />
-              <Area 
-                type="monotone" 
-                dataKey="amount" 
-                stroke={theme.palette.primary.main} 
-                fill={`${theme.palette.primary.main}40`} 
-                name="Lượng nước (lít)" 
+              <Area
+                type="monotone"
+                dataKey="amount"
+                stroke={theme.palette.primary.main}
+                fill={`${theme.palette.primary.main}40`}
+                name="Lượng nước (lít)"
               />
             </AreaChart>
           </ResponsiveContainer>
