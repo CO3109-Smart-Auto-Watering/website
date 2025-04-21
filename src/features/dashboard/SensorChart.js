@@ -57,20 +57,19 @@ const SensorChart = ({ selectedDevice }) => {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  
+
   useEffect(() => {
     const fetchData = async () => {
       if (!selectedDevice) {
-        console.log('No selected device provided');
         setData([]);
         setError('Vui lòng chọn một thiết bị để hiển thị dữ liệu.');
         setLoading(false);
         return;
       }
-  
+
       setLoading(true);
       setError(null);
-  
+
       try {
         let limit;
         switch (period) {
@@ -89,111 +88,98 @@ const SensorChart = ({ selectedDevice }) => {
           default:
             limit = 24;
         }
-  
-        console.log('Fetching data for:', { feedNames: ['sensor-temp', 'sensor-humidity', 'sensor-soil'], limit, deviceId: selectedDevice });
-  
+
         const [tempData, humidityData, soilData] = await Promise.all([
-          getHistoricalData('sensor-temp', limit, selectedDevice).catch(err => {
-            console.error('Error fetching sensor-temp:', err.response?.data || err.message);
-            return { success: false, data: [] };
-          }),
-          getHistoricalData('sensor-humidity', limit, selectedDevice).catch(err => {
-            console.error('Error fetching sensor-humidity:', err.response?.data || err.message);
-            return { success: false, data: [] };
-          }),
-          getHistoricalData('sensor-soil', limit, selectedDevice).catch(err => {
-            console.error('Error fetching sensor-soil:', err.response?.data || err.message);
-            return { success: false, data: [] };
-          })
+          getHistoricalData('sensor-temp', limit, selectedDevice).catch(err => ({
+            success: false,
+            data: [],
+          })),
+          getHistoricalData('sensor-humidity', limit, selectedDevice).catch(err => ({
+            success: false,
+            data: [],
+          })),
+          getHistoricalData('sensor-soil', limit, selectedDevice).catch(err => ({
+            success: false,
+            data: [],
+          })),
         ]);
-  
-        console.log('Fetched data:', { tempData, humidityData, soilData });
-  
+
         if (!tempData.success && !humidityData.success && !soilData.success) {
-          setError(tempData.data?.message || 'Thiết bị không tồn tại hoặc bạn không có quyền truy cập.');
+          setError('Thiết bị không tồn tại hoặc bạn không có quyền truy cập.');
           setData([]);
           setLoading(false);
           return;
         }
-  
+
         const combinedData = processData(tempData, humidityData, soilData);
-        console.log('Processed data:', combinedData);
-  
-        setData(combinedData.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)));
+        setData(combinedData.sort((a, b) => a.timestamp - b.timestamp));
       } catch (err) {
-        console.error('Unexpected error fetching sensor data:', err);
-        setError(err.response?.status === 403 
-          ? 'Thiết bị không hợp lệ hoặc bạn không có quyền truy cập.' 
-          : 'Không thể tải dữ liệu. Vui lòng thử lại sau.');
+        setError(
+          err.response?.status === 403
+            ? 'Thiết bị không hợp lệ hoặc bạn không có quyền truy cập.'
+            : 'Không thể tải dữ liệu. Vui lòng thử lại sau.'
+        );
       } finally {
         setLoading(false);
       }
     };
-  
+
     fetchData();
-  
-    // Polling: Gọi lại fetchData mỗi 10 giây
     const intervalId = setInterval(fetchData, 10000);
-  
-    // Cleanup interval khi component unmount hoặc dependencies thay đổi
     return () => clearInterval(intervalId);
   }, [period, selectedDevice]);
-  
+
   // Hàm xử lý và kết hợp dữ liệu từ các cảm biến
   const processData = (tempData, humidityData, soilData) => {
-    // Tạo map với key là timestamp để gộp dữ liệu cùng thời điểm
     const dataMap = new Map();
-    
+    const timestamps = new Set();
+
+    // Thu thập tất cả các timestamp từ các cảm biến
+    const addTimestamps = (sensorData) => {
+      if (sensorData && sensorData.data) {
+        sensorData.data.forEach(item => {
+          const timestamp = new Date(item.createdAt).getTime();
+          timestamps.add(timestamp);
+        });
+      }
+    };
+
+    addTimestamps(tempData);
+    addTimestamps(humidityData);
+    addTimestamps(soilData);
+
+    // Tạo dữ liệu cho mỗi timestamp
+    timestamps.forEach(timestamp => {
+      dataMap.set(timestamp, { timestamp });
+    });
+
     // Xử lý dữ liệu nhiệt độ
     if (tempData && tempData.data) {
       tempData.data.forEach(item => {
         const timestamp = new Date(item.createdAt).getTime();
-        if (!dataMap.has(timestamp)) {
-          dataMap.set(timestamp, { 
-            timestamp: timestamp,
-            temperature: parseFloat(item.value)
-          });
-        } else {
-          dataMap.get(timestamp).temperature = parseFloat(item.value);
-        }
+        dataMap.get(timestamp).temperature = parseFloat(item.value);
       });
     }
-    
+
     // Xử lý dữ liệu độ ẩm không khí
     if (humidityData && humidityData.data) {
       humidityData.data.forEach(item => {
         const timestamp = new Date(item.createdAt).getTime();
-        if (!dataMap.has(timestamp)) {
-          dataMap.set(timestamp, { 
-            timestamp: timestamp,
-            humidity: parseFloat(item.value)
-          });
-        } else {
-          dataMap.get(timestamp).humidity = parseFloat(item.value);
-        }
+        dataMap.get(timestamp).humidity = parseFloat(item.value);
       });
     }
-    
+
     // Xử lý dữ liệu độ ẩm đất
     if (soilData && soilData.data) {
       soilData.data.forEach(item => {
         const timestamp = new Date(item.createdAt).getTime();
-        if (!dataMap.has(timestamp)) {
-          dataMap.set(timestamp, { 
-            timestamp: timestamp,
-            soil: parseFloat(item.value)
-          });
-        } else {
-          dataMap.get(timestamp).soil = parseFloat(item.value);
-        }
+        dataMap.get(timestamp).soil = parseFloat(item.value);
       });
     }
-    
-    // Chuyển Map thành Array để sử dụng với Recharts
+
     return Array.from(dataMap.values());
   };
-  
-  // Hiển thị màn hình loading
+
   if (loading) {
     return (
       <LoadingContainer>
@@ -201,8 +187,7 @@ const SensorChart = ({ selectedDevice }) => {
       </LoadingContainer>
     );
   }
-  
-  // Hiển thị thông báo lỗi
+
   if (error) {
     return (
       <Box p={3}>
@@ -210,8 +195,7 @@ const SensorChart = ({ selectedDevice }) => {
       </Box>
     );
   }
-  
-  // Hiển thị thông báo nếu không có dữ liệu
+
   if (!data || data.length === 0) {
     return (
       <Box p={3}>
@@ -236,7 +220,7 @@ const SensorChart = ({ selectedDevice }) => {
             <MenuItem value="30d">30 ngày qua</MenuItem>
           </Select>
         </FormControl>
-        
+
         <FormControl variant="outlined" size="small" style={{ minWidth: 150 }}>
           <InputLabel>Loại cảm biến</InputLabel>
           <Select
@@ -253,81 +237,81 @@ const SensorChart = ({ selectedDevice }) => {
       </Controls>
 
       <ResponsiveContainer width="100%" height="85%">
-      <LineChart
-        data={data}
-        margin={{ top: 5, right: 30, left: 20, bottom: 35 }}
-      >
-        <CartesianGrid strokeDasharray="3 3" />
-        <XAxis 
-          dataKey="timestamp" 
-          tickFormatter={(timestamp) => {
-            const date = new Date(timestamp);
-            return period === '30d' || period === '7d' 
-              ? date.toLocaleDateString() 
-              : date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-          }}
-          label={{ 
-            value: 'Thời gian', 
-            position: 'insideBottomRight', 
-            offset: -10,
-            style: { textAnchor: 'end' }
-          }}
-          height={60}
-          angle={-30}
-          textAnchor="end"
-        />
-        
-        {/* Chỉ giữ lại một trục Y duy nhất */}
-        <YAxis 
-          label={{ 
-            value: 'Giá trị', 
-            angle: -90, 
-            position: 'insideLeft',
-            style: { textAnchor: 'middle' }
-          }}
-          domain={[0, 'dataMax + 10']}
-        />
-        
-        <Tooltip content={<CustomTooltip />} />
-        <Legend />
-        
-        {(sensorType === 'all' || sensorType === 'temperature') && (
-          <Line
-            type="monotone"
-            dataKey="temperature"
-            name="Nhiệt độ"
-            stroke={theme.palette.error.main}
-            activeDot={{ r: 8 }}
-            strokeWidth={2}
-            dot={{ strokeWidth: 2 }}
+        <LineChart
+          data={data}
+          margin={{ top: 5, right: 30, left: 20, bottom: 35 }}
+        >
+          <CartesianGrid strokeDasharray="3 3" />
+          <XAxis
+            dataKey="timestamp"
+            tickFormatter={(timestamp) => {
+              const date = new Date(timestamp);
+              return period === '30d' || period === '7d'
+                ? date.toLocaleDateString()
+                : date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            }}
+            label={{
+              value: 'Thời gian',
+              position: 'insideBottomRight',
+              offset: -10,
+              style: { textAnchor: 'end' },
+            }}
+            height={60}
+            angle={-30}
+            textAnchor="end"
           />
-        )}
-        
-        {(sensorType === 'all' || sensorType === 'humidity') && (
-          <Line
-            type="monotone"
-            dataKey="humidity"
-            name="Độ ẩm không khí"
-            stroke={theme.palette.info.main}
-            activeDot={{ r: 8 }}
-            strokeWidth={2}
-            dot={{ strokeWidth: 2 }}
+          <YAxis
+            label={{
+              value: 'Giá trị',
+              angle: -90,
+              position: 'insideLeft',
+              style: { textAnchor: 'middle' },
+            }}
+            domain={[0, 'dataMax + 10']}
           />
-        )}
-        
-        {(sensorType === 'all' || sensorType === 'soil') && (
-          <Line
-            type="monotone"
-            dataKey="soil"
-            name="Độ ẩm đất"
-            stroke={theme.palette.success.main}
-            activeDot={{ r: 8 }}
-            strokeWidth={2}
-            dot={{ strokeWidth: 2 }}
-          />
-        )}
-      </LineChart>
-    </ResponsiveContainer>
+          <Tooltip content={<CustomTooltip />} />
+          <Legend />
+
+          {(sensorType === 'all' || sensorType === 'temperature') && (
+            <Line
+              type="monotone"
+              dataKey="temperature"
+              name="Nhiệt độ"
+              stroke={theme.palette.error.main}
+              activeDot={{ r: 8 }}
+              strokeWidth={2}
+              dot={{ strokeWidth: 2 }}
+              connectNulls={true}
+            />
+          )}
+
+          {(sensorType === 'all' || sensorType === 'humidity') && (
+            <Line
+              type="monotone"
+              dataKey="humidity"
+              name="Độ ẩm không khí"
+              stroke={theme.palette.info.main}
+              activeDot={{ r: 8 }}
+              strokeWidth={2}
+              dot={{ strokeWidth: 2 }}
+              connectNulls={true}
+            />
+          )}
+
+          {(sensorType === 'all' || sensorType === 'soil') && (
+            <Line
+              type="monotone"
+              dataKey="soil"
+              name="Độ ẩm đất"
+              stroke={theme.palette.success.main}
+              activeDot={{ r: 8 }}
+              strokeWidth={2}
+              dot={{ strokeWidth: 2 }}
+              connectNulls={true}
+            />
+          )}
+        </LineChart>
+      </ResponsiveContainer>
     </ChartContainer>
   );
 };
