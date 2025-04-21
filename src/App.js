@@ -10,7 +10,7 @@ function App() {
     <CustomThemeProvider>
       <AuthProvider>
         <CssBaseline />
-        <Router>
+        <Router basename="/website">
           <AppRoutes />
         </Router>
       </AuthProvider>

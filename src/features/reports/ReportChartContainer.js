@@ -55,94 +55,111 @@ const NoDataMessage = styled.div`
     margin-bottom: 12px;
     opacity: 0.5;
   }
+
+  .spinner {
+    border: 4px solid rgba(0, 0, 0, 0.1);
+    border-top-color: #4975d1;
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
 `;
 
 const COLORS = ['#4975d1', '#ff7300', '#82ca9d', '#8884d8', '#ffc658'];
 
-const ReportChartContainer = ({ sensorData, wateringEvents, dataType }) => {
-  // Format dates for display
+const ReportChartContainer = ({ sensorData = [], wateringEvents = [], dataType = 'all', isLoading = false }) => {
   const formattedSensorData = sensorData.map(item => ({
     ...item,
-    date: new Date(item.date).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })
+    date: new Date(item.timestamp || item.date).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })
   }));
-  
-  // Check if we should display each chart type
+
   const showTemperatureChart = (dataType === 'all' || dataType === 'temperature') && 
-                               sensorData.some(item => item.temperature !== undefined);
-                               
+                              sensorData.some(item => item.temperature !== undefined && item.temperature !== null);
   const showHumidityChart = (dataType === 'all' || dataType === 'humidity') && 
-                            sensorData.some(item => item.humidity !== undefined);
-                            
+                            sensorData.some(item => item.humidity !== undefined && item.humidity !== null);
   const showSoilMoistureChart = (dataType === 'all' || dataType === 'soil') && 
-                                sensorData.some(item => item.soilMoisture !== undefined);
-                                
+                                sensorData.some(item => item.soilMoisture !== undefined && item.soilMoisture !== null);
   const showWateringChart = (dataType === 'all' || dataType === 'watering') && 
                            wateringEvents.length > 0;
 
-  // Process data for watering chart
   const wateringByDay = {};
-  
   wateringEvents.forEach(event => {
-    const date = new Date(event.timestamp).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
-    
+    const date = new Date(event.timestamp || event.date).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
     if (!wateringByDay[date]) {
       wateringByDay[date] = {
         date,
         count: 0,
         duration: 0,
-        waterUsed: 0
+        waterUsed: 0,
       };
     }
-    
     wateringByDay[date].count += 1;
-    wateringByDay[date].duration += event.duration;
-    wateringByDay[date].waterUsed += event.waterUsed;
+    wateringByDay[date].duration += event.duration || 0;
+    wateringByDay[date].waterUsed += event.waterUsed || 0;
   });
-  
+
   const wateringChartData = Object.values(wateringByDay);
-  
-  // Process data for watering distribution by zone
+
   const wateringByZone = {};
-  
   wateringEvents.forEach(event => {
-    if (!wateringByZone[event.zone]) {
-      wateringByZone[event.zone] = 0;
+    if (!wateringByZone[event.zone || event.areaName]) {
+      wateringByZone[event.zone || event.areaName] = 0;
     }
-    
-    wateringByZone[event.zone] += event.waterUsed;
+    wateringByZone[event.zone || event.areaName] += event.waterUsed || 0;
   });
-  
+
   const distributionData = Object.keys(wateringByZone).map(zone => ({
     name: zone,
-    value: wateringByZone[zone]
+    value: wateringByZone[zone],
   }));
-  
-  // Process data for manual vs automatic distribution
+
   const wateringByType = {
     'Tự động': 0,
-    'Thủ công': 0
+    'Thủ công': 0,
   };
-  
   wateringEvents.forEach(event => {
-    const type = event.trigger === 'automatic' ? 'Tự động' : 'Thủ công';
-    wateringByType[type] += event.waterUsed;
+    const type = (event.trigger === 'automatic' || event.type === 'Tự động') ? 'Tự động' : 'Thủ công';
+    wateringByType[type] += event.waterUsed || 0;
   });
-  
+
   const typeDistributionData = Object.keys(wateringByType).map(type => ({
     name: type,
-    value: wateringByType[type]
+    value: wateringByType[type],
   }));
+
+  if (isLoading) {
+    return (
+      <NoDataMessage>
+        <div className="spinner" />
+        <p>Đang tải dữ liệu biểu đồ...</p>
+      </NoDataMessage>
+    );
+  }
+
+  if (sensorData.length === 0 && wateringEvents.length === 0) {
+    return (
+      <NoDataMessage>
+        <FaChartLine style={{ fontSize: '2rem' }}/>
+        <p>Không có dữ liệu trong khoảng thời gian đã chọn</p>
+      </NoDataMessage>
+    );
+  }
 
   return (
     <ChartsContainer>
-      {/* Temperature chart */}
       {showTemperatureChart && (
         <ChartCard>
           <ChartHeader>
             <FaChartLine />
             <ChartTitle>Biểu đồ nhiệt độ</ChartTitle>
           </ChartHeader>
-          
           <ResponsiveContainer width="100%" height={300}>
             <LineChart
               data={formattedSensorData}
@@ -166,14 +183,12 @@ const ReportChartContainer = ({ sensorData, wateringEvents, dataType }) => {
         </ChartCard>
       )}
       
-      {/* Humidity chart */}
       {showHumidityChart && (
         <ChartCard>
           <ChartHeader>
             <FaChartLine />
             <ChartTitle>Biểu đồ độ ẩm không khí</ChartTitle>
           </ChartHeader>
-          
           <ResponsiveContainer width="100%" height={300}>
             <LineChart
               data={formattedSensorData}
@@ -197,14 +212,12 @@ const ReportChartContainer = ({ sensorData, wateringEvents, dataType }) => {
         </ChartCard>
       )}
       
-      {/* Soil moisture chart */}
       {showSoilMoistureChart && (
         <ChartCard>
           <ChartHeader>
             <FaChartLine />
             <ChartTitle>Biểu đồ độ ẩm đất</ChartTitle>
           </ChartHeader>
-          
           <ResponsiveContainer width="100%" height={300}>
             <LineChart
               data={formattedSensorData}
@@ -228,14 +241,12 @@ const ReportChartContainer = ({ sensorData, wateringEvents, dataType }) => {
         </ChartCard>
       )}
       
-      {/* Watering chart */}
       {showWateringChart && (
         <ChartCard>
           <ChartHeader>
             <FaChartBar />
             <ChartTitle>Thống kê tưới nước theo ngày</ChartTitle>
           </ChartHeader>
-          
           {wateringChartData.length > 0 ? (
             <ResponsiveContainer width="100%" height={300}>
               <BarChart
@@ -273,14 +284,12 @@ const ReportChartContainer = ({ sensorData, wateringEvents, dataType }) => {
         </ChartCard>
       )}
       
-      {/* Water distribution by zone */}
       {showWateringChart && distributionData.length > 0 && (
         <ChartCard>
           <ChartHeader>
             <FaChartPie />
             <ChartTitle>Phân bố sử dụng nước theo khu vực</ChartTitle>
           </ChartHeader>
-          
           <ResponsiveContainer width="100%" height={300}>
             <PieChart>
               <Pie
@@ -306,14 +315,12 @@ const ReportChartContainer = ({ sensorData, wateringEvents, dataType }) => {
         </ChartCard>
       )}
       
-      {/* Water distribution by type (automatic vs manual) */}
-      {showWateringChart && typeDistributionData.length > 0 && (
+      {showWateringChart && typeDistributionData.length > 0 && typeDistributionData.some(item => item.value > 0) && (
         <ChartCard>
           <ChartHeader>
             <FaChartPie />
             <ChartTitle>Phân bố kiểu tưới (tự động/thủ công)</ChartTitle>
           </ChartHeader>
-          
           <ResponsiveContainer width="100%" height={300}>
             <PieChart>
               <Pie
@@ -328,8 +335,8 @@ const ReportChartContainer = ({ sensorData, wateringEvents, dataType }) => {
                 label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
                 isAnimationActive={false}
               >
-                <Cell fill="#4975d1" /> {/* Auto */}
-                <Cell fill="#ff7300" /> {/* Manual */}
+                <Cell fill="#4975d1" />
+                <Cell fill="#ff7300" />
               </Pie>
               <Tooltip formatter={(value) => `${value.toFixed(1)} lít`} />
               <Legend formatter={(value) => `${value}`} />

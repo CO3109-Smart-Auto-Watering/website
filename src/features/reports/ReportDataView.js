@@ -13,6 +13,7 @@ const TabsContainer = styled.div`
   display: flex;
   border-bottom: 1px solid #e0e0e0;
   margin-bottom: 20px;
+  flex-wrap: wrap;
 `;
 
 const Tab = styled.div`
@@ -118,19 +119,37 @@ const PageButton = styled.button`
   }
 `;
 
-const ReportDataView = ({ sensorData, wateringEvents, dataType }) => {
+const LoadingContainer = styled.div`
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 40px;
+  
+  .spinner {
+    border: 4px solid rgba(0, 0, 0, 0.1);
+    border-top-color: #4975d1;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    animation: spin 1s linear infinite;
+  }
+  
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+`;
+
+const ReportDataView = ({ sensorData = [], wateringEvents = [], dataType = 'all', isLoading = false }) => {
   const [activeTab, setActiveTab] = useState(
     dataType === 'watering' ? 'watering' : 'sensor'
   );
   const [page, setPage] = useState(1);
   const itemsPerPage = 10;
 
-  // Show watering tab based on dataType and data availability
-  const showWateringTab = dataType === 'all' || dataType === 'watering';
-  const showSensorTab = dataType === 'all' || dataType === 'temperature' || 
-                         dataType === 'humidity' || dataType === 'soil';
+  const showWateringTab = (dataType === 'all' || dataType === 'watering') && wateringEvents.length > 0;
+  const showSensorTab = (dataType === 'all' || dataType === 'temperature' || 
+                        dataType === 'humidity' || dataType === 'soil') && sensorData.length > 0;
 
-  // Calculate pagination
   const sensorDataPaginated = sensorData.slice(
     (page - 1) * itemsPerPage, 
     page * itemsPerPage
@@ -145,12 +164,36 @@ const ReportDataView = ({ sensorData, wateringEvents, dataType }) => {
     (activeTab === 'sensor' ? sensorData.length : wateringEvents.length) / itemsPerPage
   );
 
-  // Change page
   const handlePageChange = (newPage) => {
     if (newPage > 0 && newPage <= totalPages) {
       setPage(newPage);
     }
   };
+
+  if (isLoading) {
+    return (
+      <Container>
+        <LoadingContainer>
+          <div className="spinner"></div>
+        </LoadingContainer>
+      </Container>
+    );
+  }
+
+  if (sensorData.length === 0 && wateringEvents.length === 0) {
+    return (
+      <Container>
+        <TableContainer>
+          <TableHeader>
+            Không có dữ liệu
+          </TableHeader>
+          <div style={{ padding: '40px', textAlign: 'center', color: '#666' }}>
+            Không có dữ liệu trong khoảng thời gian đã chọn
+          </div>
+        </TableContainer>
+      </Container>
+    );
+  }
 
   return (
     <Container>
@@ -164,7 +207,7 @@ const ReportDataView = ({ sensorData, wateringEvents, dataType }) => {
           </Tab>
         )}
         
-        {showWateringTab && wateringEvents.length > 0 && (
+        {showWateringTab && (
           <Tab 
             $active={activeTab === 'watering'} 
             onClick={() => { setActiveTab('watering'); setPage(1); }}
@@ -184,6 +227,7 @@ const ReportDataView = ({ sensorData, wateringEvents, dataType }) => {
             <thead>
               <tr>
                 <Th>Ngày</Th>
+                <Th>Thiết bị</Th>
                 {(dataType === 'all' || dataType === 'temperature') && <Th>Nhiệt độ (°C)</Th>}
                 {(dataType === 'all' || dataType === 'humidity') && <Th>Độ ẩm không khí (%)</Th>}
                 {(dataType === 'all' || dataType === 'soil') && <Th>Độ ẩm đất (%)</Th>}
@@ -193,7 +237,8 @@ const ReportDataView = ({ sensorData, wateringEvents, dataType }) => {
               {sensorDataPaginated.length > 0 ? (
                 sensorDataPaginated.map((item, idx) => (
                   <Tr key={idx}>
-                    <Td>{new Date(item.date).toLocaleDateString('vi-VN')}</Td>
+                    <Td>{new Date(item.timestamp || item.date).toLocaleDateString('vi-VN')}</Td>
+                    <Td>{item.deviceId || 'Không xác định'}</Td>
                     {(dataType === 'all' || dataType === 'temperature') && (
                       <Td>{item.temperature !== undefined ? item.temperature.toFixed(1) : '-'}</Td>
                     )}
@@ -207,7 +252,7 @@ const ReportDataView = ({ sensorData, wateringEvents, dataType }) => {
                 ))
               ) : (
                 <EmptyRow>
-                  <Td colSpan="4">Không có dữ liệu cảm biến trong khoảng thời gian này</Td>
+                  <Td colSpan={3 + (dataType === 'all' ? 3 : 1)}>Không có dữ liệu cảm biến trong khoảng thời gian này</Td>
                 </EmptyRow>
               )}
             </tbody>
@@ -219,8 +264,9 @@ const ReportDataView = ({ sensorData, wateringEvents, dataType }) => {
             <thead>
               <tr>
                 <Th>Thời gian</Th>
-                <Th>Thời lượng (phút)</Th>
+                <Th>Thiết bị</Th>
                 <Th>Khu vực</Th>
+                <Th>Thời lượng (phút)</Th>
                 <Th>Loại</Th>
                 <Th>Lượng nước (lít)</Th>
               </tr>
@@ -229,23 +275,23 @@ const ReportDataView = ({ sensorData, wateringEvents, dataType }) => {
               {wateringEventsPaginated.length > 0 ? (
                 wateringEventsPaginated.map((event, idx) => (
                   <Tr key={idx}>
-                    <Td>{new Date(event.timestamp).toLocaleString('vi-VN')}</Td>
+                    <Td>{new Date(event.timestamp || event.date).toLocaleString('vi-VN')}</Td>
+                    <Td>{event.deviceId || 'Không xác định'}</Td>
+                    <Td>{event.zone || event.areaName || 'Không xác định'}</Td>
                     <Td>{event.duration}</Td>
-                    <Td>{event.zone}</Td>
-                    <Td>{event.trigger === 'automatic' ? 'Tự động' : 'Thủ công'}</Td>
-                    <Td>{event.waterUsed.toFixed(1)}</Td>
+                    <Td>{event.trigger === 'automatic' || event.type === 'Tự động' ? 'Tự động' : 'Thủ công'}</Td>
+                    <Td>{(event.waterUsed || 0).toFixed(1)}</Td>
                   </Tr>
                 ))
               ) : (
                 <EmptyRow>
-                  <Td colSpan="5">Không có dữ liệu tưới nước trong khoảng thời gian này</Td>
+                  <Td colSpan="6">Không có dữ liệu tưới nước trong khoảng thời gian này</Td>
                 </EmptyRow>
               )}
             </tbody>
           </Table>
         )}
         
-        {/* Pagination */}
         {totalPages > 1 && (
           <PaginationContainer>
             <PageInfo>
