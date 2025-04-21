@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Typography, Card, CardContent, Button, Grid, TextField, 
+import {
+  Typography, Card, CardContent, Button, Grid, TextField,
   FormControl, InputLabel, MenuItem, Select, FormControlLabel,
   Switch, Box, Paper, Chip, IconButton, Alert, Snackbar,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
@@ -15,10 +15,12 @@ import DevicesIcon from '@mui/icons-material/Devices';
 import GrassIcon from '@mui/icons-material/Grass';
 import ErrorIcon from '@mui/icons-material/Error';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import { format, isAfter, isBefore, addMinutes } from 'date-fns';
-import { 
+import InfoIcon from '@mui/icons-material/Info';
+import { format, isAfter, isBefore, addMinutes, parseISO } from 'date-fns';
+import { toZonedTime, utcToZonedTime, format as formatTz } from 'date-fns-tz';
+import {
   getAllSchedules, createSchedule, updateSchedule,
-  deleteSchedule, toggleScheduleStatus 
+  deleteSchedule, toggleScheduleStatus
 } from '../../services/scheduleService';
 import { getUserDevices, getDeviceAreaMapping } from '../../services/deviceService';
 import { getAreas } from '../../services/areaService';
@@ -52,6 +54,11 @@ const ScheduleManager = () => {
   const [editMode, setEditMode] = useState(false);
   const [editScheduleId, setEditScheduleId] = useState(null);
   const [currentTime, setCurrentTime] = useState(new Date());
+  
+  // Timezone info
+  const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const timezoneOffset = new Date().getTimezoneOffset() / -60;
+  const timezoneDisplay = `${userTimezone} (UTC${timezoneOffset >= 0 ? '+' : ''}${timezoneOffset})`;
 
   // Update current time every minute
   useEffect(() => {
@@ -165,6 +172,17 @@ const ScheduleManager = () => {
     }
   };
 
+  // Convert local date time to UTC for server
+  const convertToUTC = (localDateTimeString) => {
+    if (!localDateTimeString) return '';
+    
+    // Parse local datetime string to Date object
+    const localDate = new Date(localDateTimeString);
+    
+    // Convert to UTC ISO string and return
+    return localDate.toISOString();
+  };
+
   // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -199,7 +217,8 @@ const ScheduleManager = () => {
       };
       
       if (scheduleType === 'onetime') {
-        scheduleData.scheduledDateTime = scheduledDateTime;
+        // Convert local time to UTC before sending to server
+        scheduleData.scheduledDateTime = convertToUTC(scheduledDateTime);
       } else {
         scheduleData.startTime = startTime;
         scheduleData.daysOfWeek = daysOfWeek;
@@ -290,13 +309,15 @@ const ScheduleManager = () => {
     setSelectedDeviceActive(device ? device.isActive : false);
     
     if (schedule.scheduleType === 'onetime') {
-      // Format date to local datetime-local input format
-      const dateObj = new Date(schedule.scheduledDateTime);
-      const year = dateObj.getFullYear();
-      const month = String(dateObj.getMonth() + 1).padStart(2, '0');
-      const day = String(dateObj.getDate()).padStart(2, '0');
-      const hours = String(dateObj.getHours()).padStart(2, '0');
-      const minutes = String(dateObj.getMinutes()).padStart(2, '0');
+      // Format UTC date from server to local datetime-local input format
+      const utcDate = parseISO(schedule.scheduledDateTime);
+      const localDate = toZonedTime(utcDate, userTimezone);
+      
+      const year = localDate.getFullYear();
+      const month = String(localDate.getMonth() + 1).padStart(2, '0');
+      const day = String(localDate.getDate()).padStart(2, '0');
+      const hours = String(localDate.getHours()).padStart(2, '0');
+      const minutes = String(localDate.getMinutes()).padStart(2, '0');
       
       setScheduledDateTime(`${year}-${month}-${day}T${hours}:${minutes}`);
     } else {
@@ -440,6 +461,13 @@ const ScheduleManager = () => {
     const plantName = getPlantName(selectedArea, selectedPlantIndex);
     
     return { areaName, plantName };
+  };
+
+  // Format UTC time from server to local timezone for display
+  const formatScheduleDateTime = (utcDateStr) => {
+    const utcDate = parseISO(utcDateStr);
+    const localDate = toZonedTime(utcDate, userTimezone);
+    return format(localDate, 'dd/MM/yyyy HH:mm');
   };
 
   return (
@@ -662,18 +690,26 @@ const ScheduleManager = () => {
                 </Typography>
                 
                 {scheduleType === 'onetime' ? (
-                  <TextField
-                    label="Thời gian tưới"
-                    type="datetime-local"
-                    value={scheduledDateTime}
-                    onChange={(e) => setScheduledDateTime(e.target.value)}
-                    InputLabelProps={{
-                      shrink: true,
-                    }}
-                    fullWidth
-                    required
-                    helperText="Chọn thời điểm bắt đầu tưới"
-                  />
+                  <>
+                    <TextField
+                      label="Thời gian tưới"
+                      type="datetime-local"
+                      value={scheduledDateTime}
+                      onChange={(e) => setScheduledDateTime(e.target.value)}
+                      InputLabelProps={{
+                        shrink: true,
+                      }}
+                      fullWidth
+                      required
+                      helperText="Chọn thời điểm bắt đầu tưới (theo giờ địa phương)"
+                    />
+                    <Box sx={{ mt: 1, display: 'flex', alignItems: 'center' }}>
+                      <InfoIcon fontSize="small" sx={{ mr: 0.5, color: 'info.main' }} />
+                      <Typography variant="caption" color="text.secondary">
+                        Múi giờ hiện tại: {timezoneDisplay}
+                      </Typography>
+                    </Box>
+                  </>
                 ) : (
                   <Grid container spacing={2}>
                     <Grid item xs={12} sm={6}>
@@ -816,7 +852,7 @@ const ScheduleManager = () => {
                       </TableCell>
                       <TableCell>
                         {schedule.scheduleType === 'onetime' 
-                          ? format(new Date(schedule.scheduledDateTime), 'dd/MM/yyyy HH:mm')
+                          ? formatScheduleDateTime(schedule.scheduledDateTime)
                           : (
                             <>
                               {schedule.startTime}<br/>
